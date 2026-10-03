@@ -1,0 +1,6 @@
+{
+  "name": "Aerial",
+  "description": "Aerial - Your next journey starts with Aerial. Search flights, compare fares, and find a flight that fits your plans.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

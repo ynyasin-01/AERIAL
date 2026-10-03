@@ -1,11 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const ScrollAnimationBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [firstFrameLoaded, setFirstFrameLoaded] = useState(false);
   const frameCount = 300;
 
-  const getFrameUrl = (index: number) =>
-    `${import.meta.env.BASE_URL}assets/ezgif/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`;
+  const getFrameUrl = (index: number) => {
+    const rawBase = import.meta.env.BASE_URL || '/';
+    const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+    return `${baseUrl}assets/ezgif/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`;
+  };
+
+  const firstFrameUrl = getFrameUrl(1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -20,13 +26,12 @@ const ScrollAnimationBackground: React.FC = () => {
     let targetProgress = 0;
     let currentProgress = 0;
     let renderedFrame = -1;
-    let isInitialDrawn = false;
     let animationFrameId: number;
     let isUnmounted = false;
 
     // Cover-fit image on canvas maintaining 16:9 aspect ratio and sharpness
     const drawImageCover = (img: HTMLImageElement) => {
-      if (!img || !img.complete || !img.naturalWidth || !ctx) return;
+      if (!img || !img.complete || !img.naturalWidth || !ctx || !canvas) return;
 
       const cw = canvas.width;
       const ch = canvas.height;
@@ -60,7 +65,7 @@ const ScrollAnimationBackground: React.FC = () => {
         }
       }
 
-      return images[1] || null;
+      return (images[1] && isLoaded[1]) ? images[1] : null;
     };
 
     // Responsive high-DPI canvas sizing
@@ -87,42 +92,80 @@ const ScrollAnimationBackground: React.FC = () => {
       }
     };
 
-    // Preload frames with instant first frame
-    const initPreload = () => {
-      // Priority 1: First frame
-      const firstImg = new Image();
-      firstImg.onload = () => {
+    const loadSingleFrame = (idx: number, priority = false): HTMLImageElement => {
+      if (images[idx]) return images[idx]!;
+
+      const img = new Image();
+      if (priority && 'fetchPriority' in img) {
+        (img as any).fetchPriority = 'high';
+      }
+      img.onload = () => {
         if (isUnmounted) return;
-        isLoaded[1] = 1;
-        if (!isInitialDrawn) {
-          drawImageCover(firstImg);
-          isInitialDrawn = true;
-          renderedFrame = 1;
+        isLoaded[idx] = 1;
+        if (idx === 1) {
+          setFirstFrameLoaded(true);
+        }
+
+        // If this loaded frame is what we should be displaying right now, draw it!
+        const currentTarget = Math.max(
+          1,
+          Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
+        );
+        if (currentTarget === idx || renderedFrame === -1) {
+          drawImageCover(img);
+          renderedFrame = idx;
         }
       };
-      firstImg.src = getFrameUrl(1);
-      images[1] = firstImg;
 
-      if (firstImg.complete) {
+      img.src = getFrameUrl(idx);
+      images[idx] = img;
+      return img;
+    };
+
+    // Preload frames progressively to avoid network congestion and freezing
+    const initPreload = () => {
+      // 1. Priority: Frame 1 instant
+      const firstImg = loadSingleFrame(1, true);
+      if (firstImg.complete && firstImg.naturalWidth > 0) {
         isLoaded[1] = 1;
+        setFirstFrameLoaded(true);
         drawImageCover(firstImg);
-        isInitialDrawn = true;
         renderedFrame = 1;
       }
 
-      // Priority 2: Preload subsequent frames in chunks with decode()
-      for (let i = 2; i <= frameCount; i++) {
-        const img = new Image();
-        img.onload = () => {
-          if (isUnmounted) return;
-          isLoaded[i] = 1;
-          if (img.decode) {
-            img.decode().catch(() => {});
-          }
-        };
-        img.src = getFrameUrl(i);
-        images[i] = img;
+      // 2. Preload keyframes first (every 4th frame: 5, 9, 13... up to 300)
+      const keyframes: number[] = [];
+      for (let i = 5; i <= frameCount; i += 4) {
+        keyframes.push(i);
       }
+
+      // 3. All remaining frames
+      const remainingFrames: number[] = [];
+      for (let i = 2; i <= frameCount; i++) {
+        if (i % 4 !== 1) {
+          remainingFrames.push(i);
+        }
+      }
+
+      // Load batch helper with gentle scheduling
+      const queue = [...keyframes, ...remainingFrames];
+      let queueIdx = 0;
+      const batchSize = 6;
+
+      const loadNextBatch = () => {
+        if (isUnmounted || queueIdx >= queue.length) return;
+        const end = Math.min(queueIdx + batchSize, queue.length);
+        for (let j = queueIdx; j < end; j++) {
+          loadSingleFrame(queue[j]);
+        }
+        queueIdx = end;
+        if (queueIdx < queue.length) {
+          setTimeout(loadNextBatch, 80);
+        }
+      };
+
+      // Start queue shortly after first frame
+      setTimeout(loadNextBatch, 150);
     };
 
     // Calculate normalized scroll progress (0 to 1)
@@ -130,13 +173,24 @@ const ScrollAnimationBackground: React.FC = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       targetProgress = Math.max(0, Math.min(1, scrollTop / maxScroll));
+
+      // Dynamically load frames around current target for instant response
+      const targetFrame = Math.max(
+        1,
+        Math.min(frameCount, Math.round(1 + targetProgress * (frameCount - 1)))
+      );
+      for (let off = -3; off <= 3; off++) {
+        const f = targetFrame + off;
+        if (f >= 1 && f <= frameCount && !images[f]) {
+          loadSingleFrame(f);
+        }
+      }
     };
 
     // Physics-damped animation loop (60/120Hz smooth lerp)
     const tick = () => {
       if (isUnmounted) return;
 
-      // 0.08 damping factor gives fluid, luxurious momentum
       const lerpFactor = 0.08;
       const delta = targetProgress - currentProgress;
 
@@ -153,7 +207,7 @@ const ScrollAnimationBackground: React.FC = () => {
 
       if (targetFrame !== renderedFrame) {
         const img = getBestFrame(targetFrame);
-        if (img) {
+        if (img && img.complete && img.naturalWidth > 0) {
           drawImageCover(img);
           renderedFrame = targetFrame;
         }
@@ -183,10 +237,20 @@ const ScrollAnimationBackground: React.FC = () => {
 
   return (
     <div className="fixed inset-0 w-full h-full -z-10 pointer-events-none overflow-hidden bg-black flex justify-center items-center">
+      {/* Instant Fallback Poster Image to ensure NO black screen even during initial load */}
+      <img
+        src={firstFrameUrl}
+        alt="Aerial Background"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 select-none pointer-events-none ${
+          firstFrameLoaded ? 'opacity-85' : 'opacity-60'
+        }`}
+        loading="eager"
+      />
+
       {/* High-DPI Smooth Animation Canvas */}
       <canvas
         ref={canvasRef}
-        className="w-full h-full object-cover opacity-85 transition-opacity duration-700"
+        className="absolute inset-0 w-full h-full object-cover opacity-85 transition-opacity duration-700"
       />
 
       {/* Cinematic subtle contrast vignette for crystal clear text readability across all sections */}

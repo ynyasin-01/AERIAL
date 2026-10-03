@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'Nevera';
+  src: url('/fonts/Nevera-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-nevera {
+  font-family: 'Nevera', 'Oswald', sans-serif !important;
+}
+
+@layer base {
+  *, *::before, *::after {
+    font-family: 'Oswald', sans-serif;
+    box-sizing: border-box;
+  }
+
+  html {
+    background-color: #000;
+    scroll-behavior: smooth;
+    overscroll-behavior: none;
+  }
+
+  body {
+    background-color: #000;
+    color: #ffffff;
+    font-family: 'Oswald', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom smooth styling */
+::selection {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* Minimalist sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+/* Keyframes for smooth animations */
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulseEmerald {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.1);
+    box-shadow: 0 0 8px 3px rgba(52, 211, 153, 0.4);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-modal-backdrop {
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-card {
+  animation: modalScaleIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-emerald {
+  animation: pulseEmerald 2.5s infinite ease-in-out;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+/* Glassmorphism utility helpers */
+.glass-pane {
+  background: rgba(15, 15, 20, 0.75);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+.glass-subcard {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-subcard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+
+/* SVG Logo Draw Animation */
+@keyframes logoDraw {
+  0% {
+    stroke-dashoffset: 120;
+    fill: transparent;
+    stroke: white;
+    stroke-width: 0.5px;
+  }
+  65% {
+    stroke-dashoffset: 0;
+    fill: transparent;
+    stroke: white;
+    stroke-width: 0.5px;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    fill: white;
+    stroke: transparent;
+  }
+}
+
+.logo-letter {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation-name: logoDraw;
+  animation-duration: 1.8s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+  animation-fill-mode: both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-letter {
+    animation: none !important;
+    stroke-dashoffset: 0;
+    fill: white;
+    stroke: transparent;
+  }
+}

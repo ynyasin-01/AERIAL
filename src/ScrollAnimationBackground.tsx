@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const ScrollAnimationBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [canvasReady, setCanvasReady] = useState(false);
   const frameCount = 300;
 
   const getFrameUrl = (index: number) => {
@@ -10,8 +9,6 @@ const ScrollAnimationBackground: React.FC = () => {
     const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
     return `${baseUrl}assets/ezgif/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`;
   };
-
-  const firstFrameUrl = getFrameUrl(1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -25,11 +22,11 @@ const ScrollAnimationBackground: React.FC = () => {
 
     let targetProgress = 0;
     let currentProgress = 0;
-    let renderedFrame = -1;
+    let currentlyDrawnFrame = -1;
     let animationFrameId: number;
     let isUnmounted = false;
 
-    // Cover-fit image on canvas maintaining 16:9 aspect ratio and sharpness
+    // Cover-fit image on canvas maintaining aspect ratio and sharpness
     const drawImageCover = (img: HTMLImageElement) => {
       if (!img || !img.complete || !img.naturalWidth || !ctx || !canvas) return;
 
@@ -47,8 +44,8 @@ const ScrollAnimationBackground: React.FC = () => {
       ctx.drawImage(img, x, y, w, h);
     };
 
-    // Find closest available loaded frame and return both image and its actual index
-    const getBestFrame = (target: number): { img: HTMLImageElement; index: number } | null => {
+    // Find the best loaded frame and return both image and its real frame number
+    const getBestAvailableFrame = (target: number): { img: HTMLImageElement; index: number } | null => {
       if (images[target] && isLoaded[target]) {
         return { img: images[target]!, index: target };
       }
@@ -90,10 +87,10 @@ const ScrollAnimationBackground: React.FC = () => {
         1,
         Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
       );
-      const frameData = getBestFrame(frameIdx);
-      if (frameData) {
-        drawImageCover(frameData.img);
-        renderedFrame = frameData.index;
+      const best = getBestAvailableFrame(frameIdx);
+      if (best) {
+        drawImageCover(best.img);
+        currentlyDrawnFrame = best.index;
       }
     };
 
@@ -109,22 +106,17 @@ const ScrollAnimationBackground: React.FC = () => {
         if (isUnmounted) return;
         isLoaded[idx] = 1;
 
-        if (idx === 1) {
-          setCanvasReady(true);
-        }
-
-        // If no frame has been drawn yet, or if this loaded frame is closer to target than what's rendered
-        const targetFrame = Math.max(
+        // If this newly loaded frame is closer to the current scroll target than what's currently painted on canvas
+        const currentTarget = Math.max(
           1,
           Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
         );
-        const distCurrent = Math.abs(renderedFrame - targetFrame);
-        const distNew = Math.abs(idx - targetFrame);
+        const distCurrent = Math.abs(currentlyDrawnFrame - currentTarget);
+        const distNew = Math.abs(idx - currentTarget);
 
-        if (renderedFrame === -1 || distNew < distCurrent) {
+        if (currentlyDrawnFrame === -1 || distNew < distCurrent) {
           drawImageCover(img);
-          renderedFrame = idx;
-          setCanvasReady(true);
+          currentlyDrawnFrame = idx;
         }
       };
 
@@ -140,11 +132,10 @@ const ScrollAnimationBackground: React.FC = () => {
       if (firstImg.complete && firstImg.naturalWidth > 0) {
         isLoaded[1] = 1;
         drawImageCover(firstImg);
-        renderedFrame = 1;
-        setCanvasReady(true);
+        currentlyDrawnFrame = 1;
       }
 
-      // 2. Stream-load all remaining frames in fast batches of 5 every 25ms
+      // 2. Stream-load all remaining frames in fast batches of 5 every 20ms
       let streamIdx = 2;
       const streamNext = () => {
         if (isUnmounted || streamIdx > frameCount) return;
@@ -154,12 +145,11 @@ const ScrollAnimationBackground: React.FC = () => {
         }
         streamIdx = end + 1;
         if (streamIdx <= frameCount) {
-          setTimeout(streamNext, 25);
+          setTimeout(streamNext, 20);
         }
       };
 
-      // Start stream immediately after first frame
-      setTimeout(streamNext, 50);
+      setTimeout(streamNext, 40);
     };
 
     // Calculate normalized scroll progress (0 to 1)
@@ -168,7 +158,7 @@ const ScrollAnimationBackground: React.FC = () => {
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       targetProgress = Math.max(0, Math.min(1, scrollTop / maxScroll));
 
-      // Immediately prioritize downloading frames around active scroll position
+      // Dynamically prioritize loading frames around active scroll position
       const targetFrame = Math.max(
         1,
         Math.min(frameCount, Math.round(1 + targetProgress * (frameCount - 1)))
@@ -199,14 +189,11 @@ const ScrollAnimationBackground: React.FC = () => {
         Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
       );
 
-      const frameData = getBestFrame(targetFrame);
-      if (frameData && frameData.img.complete && frameData.img.naturalWidth > 0) {
-        if (frameData.index !== renderedFrame) {
-          drawImageCover(frameData.img);
-          renderedFrame = frameData.index;
-          if (!canvasReady) {
-            setCanvasReady(true);
-          }
+      const best = getBestAvailableFrame(targetFrame);
+      if (best && best.img.complete && best.img.naturalWidth > 0) {
+        if (best.index !== currentlyDrawnFrame) {
+          drawImageCover(best.img);
+          currentlyDrawnFrame = best.index;
         }
       }
 
@@ -234,20 +221,10 @@ const ScrollAnimationBackground: React.FC = () => {
 
   return (
     <div className="fixed inset-0 w-full h-full -z-10 pointer-events-none overflow-hidden bg-black flex justify-center items-center">
-      {/* Fallback Poster Image: ONLY visible on initial paint, fades out completely once canvas renders */}
-      <img
-        src={firstFrameUrl}
-        alt="Aerial Background"
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 select-none pointer-events-none ${
-          canvasReady ? 'opacity-0' : 'opacity-100'
-        }`}
-        loading="eager"
-      />
-
-      {/* High-DPI Smooth Animation Canvas */}
+      {/* High-DPI Smooth Animation Canvas - Full opacity, NO underlying poster image */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover opacity-100 transition-opacity duration-700"
+        className="w-full h-full object-cover"
       />
 
       {/* Cinematic subtle contrast vignette for crystal clear text readability across all sections */}

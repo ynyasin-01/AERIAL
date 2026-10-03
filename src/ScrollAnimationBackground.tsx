@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 const ScrollAnimationBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [firstFrameLoaded, setFirstFrameLoaded] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
   const frameCount = 300;
 
   const getFrameUrl = (index: number) => {
@@ -47,25 +47,29 @@ const ScrollAnimationBackground: React.FC = () => {
       ctx.drawImage(img, x, y, w, h);
     };
 
-    // Find closest available loaded frame to prevent any flicker or blank frame
-    const getBestFrame = (target: number): HTMLImageElement | null => {
+    // Find closest available loaded frame and return both image and its actual index
+    const getBestFrame = (target: number): { img: HTMLImageElement; index: number } | null => {
       if (images[target] && isLoaded[target]) {
-        return images[target];
+        return { img: images[target]!, index: target };
       }
 
       // Search nearest loaded neighbor
       for (let offset = 1; offset < frameCount; offset++) {
         const prev = target - offset;
         if (prev >= 1 && images[prev] && isLoaded[prev]) {
-          return images[prev];
+          return { img: images[prev]!, index: prev };
         }
         const next = target + offset;
         if (next <= frameCount && images[next] && isLoaded[next]) {
-          return images[next];
+          return { img: images[next]!, index: next };
         }
       }
 
-      return (images[1] && isLoaded[1]) ? images[1] : null;
+      if (images[1] && isLoaded[1]) {
+        return { img: images[1]!, index: 1 };
+      }
+
+      return null;
     };
 
     // Responsive high-DPI canvas sizing
@@ -86,9 +90,10 @@ const ScrollAnimationBackground: React.FC = () => {
         1,
         Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
       );
-      const img = getBestFrame(frameIdx);
-      if (img) {
-        drawImageCover(img);
+      const frameData = getBestFrame(frameIdx);
+      if (frameData) {
+        drawImageCover(frameData.img);
+        renderedFrame = frameData.index;
       }
     };
 
@@ -99,21 +104,27 @@ const ScrollAnimationBackground: React.FC = () => {
       if (priority && 'fetchPriority' in img) {
         (img as any).fetchPriority = 'high';
       }
+
       img.onload = () => {
         if (isUnmounted) return;
         isLoaded[idx] = 1;
+
         if (idx === 1) {
-          setFirstFrameLoaded(true);
+          setCanvasReady(true);
         }
 
-        // If this loaded frame is what we should be displaying right now, draw it!
-        const currentTarget = Math.max(
+        // If no frame has been drawn yet, or if this loaded frame is closer to target than what's rendered
+        const targetFrame = Math.max(
           1,
           Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
         );
-        if (currentTarget === idx || renderedFrame === -1) {
+        const distCurrent = Math.abs(renderedFrame - targetFrame);
+        const distNew = Math.abs(idx - targetFrame);
+
+        if (renderedFrame === -1 || distNew < distCurrent) {
           drawImageCover(img);
           renderedFrame = idx;
+          setCanvasReady(true);
         }
       };
 
@@ -122,50 +133,33 @@ const ScrollAnimationBackground: React.FC = () => {
       return img;
     };
 
-    // Preload frames progressively to avoid network congestion and freezing
+    // Preload frames in quick progressive stream
     const initPreload = () => {
-      // 1. Priority: Frame 1 instant
+      // 1. Frame 1 with high priority
       const firstImg = loadSingleFrame(1, true);
       if (firstImg.complete && firstImg.naturalWidth > 0) {
         isLoaded[1] = 1;
-        setFirstFrameLoaded(true);
         drawImageCover(firstImg);
         renderedFrame = 1;
+        setCanvasReady(true);
       }
 
-      // 2. Preload keyframes first (every 4th frame: 5, 9, 13... up to 300)
-      const keyframes: number[] = [];
-      for (let i = 5; i <= frameCount; i += 4) {
-        keyframes.push(i);
-      }
-
-      // 3. All remaining frames
-      const remainingFrames: number[] = [];
-      for (let i = 2; i <= frameCount; i++) {
-        if (i % 4 !== 1) {
-          remainingFrames.push(i);
+      // 2. Stream-load all remaining frames in fast batches of 5 every 25ms
+      let streamIdx = 2;
+      const streamNext = () => {
+        if (isUnmounted || streamIdx > frameCount) return;
+        const end = Math.min(streamIdx + 5, frameCount);
+        for (let i = streamIdx; i <= end; i++) {
+          loadSingleFrame(i);
         }
-      }
-
-      // Load batch helper with gentle scheduling
-      const queue = [...keyframes, ...remainingFrames];
-      let queueIdx = 0;
-      const batchSize = 6;
-
-      const loadNextBatch = () => {
-        if (isUnmounted || queueIdx >= queue.length) return;
-        const end = Math.min(queueIdx + batchSize, queue.length);
-        for (let j = queueIdx; j < end; j++) {
-          loadSingleFrame(queue[j]);
-        }
-        queueIdx = end;
-        if (queueIdx < queue.length) {
-          setTimeout(loadNextBatch, 80);
+        streamIdx = end + 1;
+        if (streamIdx <= frameCount) {
+          setTimeout(streamNext, 25);
         }
       };
 
-      // Start queue shortly after first frame
-      setTimeout(loadNextBatch, 150);
+      // Start stream immediately after first frame
+      setTimeout(streamNext, 50);
     };
 
     // Calculate normalized scroll progress (0 to 1)
@@ -174,15 +168,15 @@ const ScrollAnimationBackground: React.FC = () => {
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       targetProgress = Math.max(0, Math.min(1, scrollTop / maxScroll));
 
-      // Dynamically load frames around current target for instant response
+      // Immediately prioritize downloading frames around active scroll position
       const targetFrame = Math.max(
         1,
         Math.min(frameCount, Math.round(1 + targetProgress * (frameCount - 1)))
       );
-      for (let off = -3; off <= 3; off++) {
+      for (let off = -4; off <= 8; off++) {
         const f = targetFrame + off;
         if (f >= 1 && f <= frameCount && !images[f]) {
-          loadSingleFrame(f);
+          loadSingleFrame(f, true);
         }
       }
     };
@@ -205,11 +199,14 @@ const ScrollAnimationBackground: React.FC = () => {
         Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
       );
 
-      if (targetFrame !== renderedFrame) {
-        const img = getBestFrame(targetFrame);
-        if (img && img.complete && img.naturalWidth > 0) {
-          drawImageCover(img);
-          renderedFrame = targetFrame;
+      const frameData = getBestFrame(targetFrame);
+      if (frameData && frameData.img.complete && frameData.img.naturalWidth > 0) {
+        if (frameData.index !== renderedFrame) {
+          drawImageCover(frameData.img);
+          renderedFrame = frameData.index;
+          if (!canvasReady) {
+            setCanvasReady(true);
+          }
         }
       }
 
@@ -237,12 +234,12 @@ const ScrollAnimationBackground: React.FC = () => {
 
   return (
     <div className="fixed inset-0 w-full h-full -z-10 pointer-events-none overflow-hidden bg-black flex justify-center items-center">
-      {/* Instant Fallback Poster Image to ensure NO black screen even during initial load */}
+      {/* Fallback Poster Image: ONLY visible on initial paint, fades out completely once canvas renders */}
       <img
         src={firstFrameUrl}
         alt="Aerial Background"
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 select-none pointer-events-none ${
-          firstFrameLoaded ? 'opacity-85' : 'opacity-60'
+          canvasReady ? 'opacity-0' : 'opacity-100'
         }`}
         loading="eager"
       />
@@ -250,7 +247,7 @@ const ScrollAnimationBackground: React.FC = () => {
       {/* High-DPI Smooth Animation Canvas */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover opacity-85 transition-opacity duration-700"
+        className="absolute inset-0 w-full h-full object-cover opacity-100 transition-opacity duration-700"
       />
 
       {/* Cinematic subtle contrast vignette for crystal clear text readability across all sections */}

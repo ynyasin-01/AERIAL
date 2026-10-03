@@ -4,9 +4,8 @@ const ScrollAnimationBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameCount = 300;
 
-  // Frame URL resolver
   const getFrameUrl = (index: number) =>
-    `/assets/ezgif/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`;
+    `${import.meta.env.BASE_URL}assets/ezgif/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`;
 
   useEffect(() => {
     const canvas = canvasRef.current;

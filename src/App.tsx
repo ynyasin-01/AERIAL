@@ -755,7 +755,7 @@ export default function App() {
               {`
                 @font-face {
                   font-family: 'NeveraSVG';
-                  src: url('/fonts/Nevera-Regular.otf') format('opentype');
+                  src: url('${import.meta.env.BASE_URL}fonts/Nevera-Regular.otf') format('opentype');
                 }
                 .svg-nevera {
                   font-family: 'NeveraSVG', 'Nevera', sans-serif !important;
@@ -2041,7 +2041,7 @@ export default function App() {
                 {`
                   @font-face {
                     font-family: 'NeveraSVG';
-                    src: url('/fonts/Nevera-Regular.otf') format('opentype');
+                    src: url('${import.meta.env.BASE_URL}fonts/Nevera-Regular.otf') format('opentype');
                   }
                   .svg-nevera {
                     font-family: 'NeveraSVG', 'Nevera', sans-serif !important;

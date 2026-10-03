@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Scroll Animation</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      background-color: #000;
+      overscroll-behavior: none;
+      scroll-behavior: auto;
+    }
+
+    body {
+      background-color: #000;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      overscroll-behavior: none;
+      height: 600vh; /* Smooth pacing across 300 frames */
+    }
+
+    /* Fixed full-screen canvas viewport */
+    .viewport {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #000;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+
+    /* Minimalist sleek scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #000;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport">
+    <canvas id="animation-canvas"></canvas>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const canvas = document.getElementById('animation-canvas');
+      const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
+      const frameCount = 300;
+      const images = new Array(frameCount + 1);
+      const isLoaded = new Uint8Array(frameCount + 1);
+
+      // Frame URL format: ezgif-frame-001.jpg ... ezgif-frame-300.jpg
+      const getFrameUrl = (index) =>
+        `ezgif-frame-${index.toString().padStart(3, '0')}.jpg`;
+
+      // Smooth interpolation state (Lerp)
+      let targetProgress = 0;
+      let currentProgress = 0;
+      let renderedFrame = -1;
+      let isInitialDrawn = false;
+
+      // Fit and center image within canvas preserving aspect ratio
+      function drawImageCover(img) {
+        if (!img || !img.complete || !img.naturalWidth) return;
+
+        const cw = canvas.width;
+        const ch = canvas.height;
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+
+        const scale = Math.max(cw / iw, ch / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        const x = (cw - w) * 0.5;
+        const y = (ch - h) * 0.5;
+
+        ctx.drawImage(img, x, y, w, h);
+      }
+
+      // Handle retina / High-DPI canvas resizing
+      function handleResize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // Redraw current frame
+        const frameIdx = Math.max(1, Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1))));
+        const img = getBestFrame(frameIdx);
+        if (img) {
+          drawImageCover(img);
+        }
+      }
+
+      // Preload images with instant first frame
+      function initPreloading() {
+        // First frame priority
+        const firstImg = new Image();
+        firstImg.onload = () => {
+          isLoaded[1] = 1;
+          if (!isInitialDrawn) {
+            drawImageCover(firstImg);
+            isInitialDrawn = true;
+            renderedFrame = 1;
+          }
+        };
+        firstImg.src = getFrameUrl(1);
+        images[1] = firstImg;
+        if (firstImg.complete) {
+          isLoaded[1] = 1;
+          drawImageCover(firstImg);
+          isInitialDrawn = true;
+          renderedFrame = 1;
+        }
+
+        // Preload subsequent frames
+        for (let i = 2; i <= frameCount; i++) {
+          const img = new Image();
+          img.onload = () => {
+            isLoaded[i] = 1;
+            if (img.decode) {
+              img.decode().catch(() => {});
+            }
+          };
+          img.src = getFrameUrl(i);
+          images[i] = img;
+        }
+      }
+
+      // Find best available frame so there is never a blank screen
+      function getBestFrame(target) {
+        if (images[target] && isLoaded[target]) {
+          return images[target];
+        }
+
+        // Search nearest loaded neighbor
+        for (let offset = 1; offset < frameCount; offset++) {
+          const prev = target - offset;
+          if (prev >= 1 && images[prev] && isLoaded[prev]) {
+            return images[prev];
+          }
+          const next = target + offset;
+          if (next <= frameCount && images[next] && isLoaded[next]) {
+            return images[next];
+          }
+        }
+
+        return images[1] || null;
+      }
+
+      // Compute target progress from scroll position
+      function onScroll() {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+        targetProgress = Math.max(0, Math.min(1, scrollTop / maxScroll));
+      }
+
+      // Silky smooth render loop using physical damping
+      function tick() {
+        // Damping factor: 0.08 produces fluid, weighted, cinematic momentum
+        const lerpFactor = 0.08;
+        const delta = targetProgress - currentProgress;
+
+        if (Math.abs(delta) > 0.00004) {
+          currentProgress += delta * lerpFactor;
+        } else {
+          currentProgress = targetProgress;
+        }
+
+        const targetFrame = Math.max(1, Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1))));
+
+        if (targetFrame !== renderedFrame) {
+          const img = getBestFrame(targetFrame);
+          if (img) {
+            drawImageCover(img);
+            renderedFrame = targetFrame;
+          }
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      // Event listeners
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', handleResize, { passive: true });
+
+      // Startup
+      handleResize();
+      initPreloading();
+      onScroll();
+      currentProgress = targetProgress;
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

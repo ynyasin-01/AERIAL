@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import ScrollAnimationBackground from './ScrollAnimationBackground';
 import {
   Plane,
@@ -62,6 +62,64 @@ function PlushyAirplaneLogo({ className = "w-8 h-8" }: { className?: string }) {
       <circle cx="28.5" cy="20.5" r="0.9" fill="#FFFFFF" />
       <circle cx="31" cy="20.5" r="0.7" fill="#FFFFFF" />
     </svg>
+  );
+}
+
+// Animated Hamburger Button with Spring Physics & Morphing Lines for Mobile
+function AnimatedHamburgerButton({
+  isOpen,
+  onClick,
+  ariaLabel = "Toggle mobile menu",
+}: {
+  isOpen: boolean;
+  onClick: () => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      whileTap={{ scale: 0.88, rotate: isOpen ? -8 : 8 }}
+      whileHover={{ scale: 1.05 }}
+      transition={{ type: "spring", stiffness: 450, damping: 22 }}
+      className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center gap-1.5 transition-colors duration-300 cursor-pointer select-none ${
+        isOpen
+          ? 'bg-white/20 border border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.25)]'
+          : 'bg-white/10 hover:bg-white/20 border border-white/30 active:bg-white/25'
+      }`}
+    >
+      {/* Top Line */}
+      <motion.span
+        animate={
+          isOpen
+            ? { rotate: 45, y: 7.5, width: 20 }
+            : { rotate: 0, y: 0, width: 20 }
+        }
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        className="h-[2px] bg-white rounded-full origin-center block"
+      />
+      {/* Middle Line */}
+      <motion.span
+        animate={
+          isOpen
+            ? { opacity: 0, scaleX: 0 }
+            : { opacity: 1, scaleX: 1, width: 20 }
+        }
+        transition={{ duration: 0.16 }}
+        className="h-[2px] bg-white rounded-full block"
+      />
+      {/* Bottom Line */}
+      <motion.span
+        animate={
+          isOpen
+            ? { rotate: -45, y: -7.5, width: 20 }
+            : { rotate: 0, y: 0, width: 14 }
+        }
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        className="h-[2px] bg-white rounded-full origin-center block self-center"
+      />
+    </motion.button>
   );
 }
 
@@ -182,6 +240,7 @@ export default function App() {
   const offersSectionRef = useRef<HTMLDivElement>(null);
   const bookingsSectionRef = useRef<HTMLDivElement>(null);
   const aboutSectionRef = useRef<HTMLDivElement>(null);
+  const flightsSectionRef = useRef<HTMLDivElement>(null);
 
   // Section 5: About & Contact State
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
@@ -245,11 +304,12 @@ export default function App() {
   const [selectedBookingForItinerary, setSelectedBookingForItinerary] = useState<BookingItem | null>(null);
 
   // Booking Engine & Flow State
-  const [bookingOriginInput, setBookingOriginInput] = useState('San Francisco (SFO)');
-  const [bookingDestInput, setBookingDestInput] = useState('Tokyo Narita (NRT)');
+  const [bookingOriginInput, setBookingOriginInput] = useState('Dhaka (DAC)');
+  const [bookingDestInput, setBookingDestInput] = useState('Bangkok (BKK)');
   const [bookingDateInput, setBookingDateInput] = useState('2026-10-15');
   const [bookingReturnDateInput, setBookingReturnDateInput] = useState('2026-10-22');
-  const [bookingPassengerSelect, setBookingPassengerSelect] = useState('1 Adult, Economy');
+  const [bookingPassengerSelect, setBookingPassengerSelect] = useState('2 Adults, Economy');
+  const [bookingEngineSort, setBookingEngineSort] = useState('Lowest Price');
   const [bookingCabinClassSelect, setBookingCabinClassSelect] = useState('Economy');
   const [bookingStep, setBookingStep] = useState<'search' | 'seats' | 'confirm' | 'payment' | 'success'>('search');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
@@ -259,6 +319,8 @@ export default function App() {
   const [selectedFlightIndex, setSelectedFlightIndex] = useState(0);
   const [confirmedBookingResult, setConfirmedBookingResult] = useState<BookingItem | null>(null);
   const [bookingDuplicateError, setBookingDuplicateError] = useState<string | null>(null);
+  const [isOriginDropdownOpen, setIsOriginDropdownOpen] = useState(false);
+  const [isDestDropdownOpen, setIsDestDropdownOpen] = useState(false);
 
   // Footer animation state
   const footerLogoRef = useRef<SVGSVGElement>(null);
@@ -280,47 +342,78 @@ export default function App() {
   }, []);
 
   // Curated live flights for Aerial Booking Engine
-  const bookingEngineFlights = [
-    {
-      flightNumber: 'AR-802',
-      type: 'Aerial Dreamliner',
-      aircraft: 'Boeing 787-9',
-      departTime: '11:20 AM',
-      arriveTime: '03:45 PM (+1)',
-      time: '11:20 AM - 03:45 PM (+1)',
-      duration: '11h 25m',
-      stops: 'Non-Stop',
-      fare: '$640',
-      numericFare: 640,
-      badge: 'Best Value',
-    },
-    {
-      flightNumber: 'AR-310',
-      type: 'Aerial Express',
-      aircraft: 'Airbus A350-900',
-      departTime: '02:40 PM',
-      arriveTime: '07:15 PM (+1)',
-      time: '02:40 PM - 07:15 PM (+1)',
-      duration: '10h 35m',
-      stops: 'Non-Stop',
-      fare: '$595',
-      numericFare: 595,
-      badge: 'Fastest',
-    },
-    {
-      flightNumber: 'AR-105',
-      type: 'Aerial Saver',
-      aircraft: 'Boeing 777-300ER',
-      departTime: '08:15 AM',
-      arriveTime: '04:30 PM (+1)',
-      time: '08:15 AM - 04:30 PM (+1)',
-      duration: '14h 15m',
-      stops: '1 Stop (Hub)',
-      fare: '$490',
-      numericFare: 490,
-      badge: 'Saver',
-    },
-  ];
+  const [appliedFilters, setAppliedFilters] = useState({
+    originCode: 'DAC',
+    destCode: 'BKK',
+    passengers: 2,
+    cabinClass: 'Economy',
+    timestamp: Date.now()
+  });
+
+  const bookingEngineFlights = React.useMemo(() => {
+    const { originCode, destCode, passengers, cabinClass } = appliedFilters;
+    const originFactor = originCode ? originCode.charCodeAt(0) : 65;
+    const destFactor = destCode ? destCode.charCodeAt(0) : 66;
+    const hash = (originFactor + destFactor) % 150;
+    
+    const classMult = cabinClass === 'Business' ? 3 : cabinClass === 'First Class' ? 5 : cabinClass === 'Premium Economy' ? 1.5 : 1;
+    const pax = passengers || 1;
+    
+    // Calculate final numeric fares based on route hash, cabin class, and passengers
+    const p1 = Math.floor((320 + hash) * classMult * pax);
+    const p2 = Math.floor((250 + hash) * classMult * pax);
+    const p3 = Math.floor((190 + hash) * classMult * pax);
+
+    const flights = [
+      {
+        flightNumber: 'AR-802',
+        type: 'Aerial Dreamliner',
+        aircraft: 'Boeing 787-9',
+        departTime: '11:20 AM',
+        arriveTime: '03:45 PM (+1)',
+        time: '11:20 AM - 03:45 PM (+1)',
+        duration: '11h 25m',
+        stops: 'Non-Stop',
+        fare: `$${p1}`,
+        numericFare: p1,
+        badge: 'Best Value',
+      },
+      {
+        flightNumber: 'AR-310',
+        type: 'Aerial Express',
+        aircraft: 'Airbus A350-900',
+        departTime: '02:40 PM',
+        arriveTime: '07:15 PM (+1)',
+        time: '02:40 PM - 07:15 PM (+1)',
+        duration: '10h 35m',
+        stops: 'Non-Stop',
+        fare: `$${p2}`,
+        numericFare: p2,
+        badge: 'Fastest',
+      },
+      {
+        flightNumber: 'AR-105',
+        type: 'Aerial Saver',
+        aircraft: 'Boeing 777-300ER',
+        departTime: '08:15 AM',
+        arriveTime: '04:30 PM (+1)',
+        time: '08:15 AM - 04:30 PM (+1)',
+        duration: '14h 15m',
+        stops: '1 Stop (Hub)',
+        fare: `$${p3}`,
+        numericFare: p3,
+        badge: 'Saver',
+      },
+    ];
+    
+    if (bookingEngineSort === 'Lowest Price') {
+      flights.sort((a, b) => a.numericFare - b.numericFare);
+    } else if (bookingEngineSort === 'Highest Price') {
+      flights.sort((a, b) => b.numericFare - a.numericFare);
+    }
+    
+    return flights;
+  }, [appliedFilters, bookingEngineSort]);
 
   // Sync bookings to localStorage whenever they change
   useEffect(() => {
@@ -475,9 +568,9 @@ export default function App() {
 
   // Section 3: Flight Offers State
   const [selectedOfferCategory, setSelectedOfferCategory] = useState<string>('Weekend Getaways');
-  const [bookingTripType, setBookingTripType] = useState<'One-way' | 'Round Trip' | 'Multi City'>('Round Trip');
-  const [bookingOriginCode, setBookingOriginCode] = useState('YVR');
-  const [bookingOriginCity, setBookingOriginCity] = useState('Vancouver');
+  const [bookingTripType, setBookingTripType] = useState<'One-way' | 'Round Trip'>('Round Trip');
+  const [bookingOriginCode, setBookingOriginCode] = useState('DAC');
+  const [bookingOriginCity, setBookingOriginCity] = useState('Dhaka');
   const [bookingDestCode, setBookingDestCode] = useState('BKK');
   const [bookingDestCity, setBookingDestCity] = useState('Bangkok');
   const [bookingDepartDate, setBookingDepartDate] = useState('28 May 2026');
@@ -579,7 +672,7 @@ export default function App() {
         origin: 'San Francisco (SFO)',
         price: '$195',
         dates: 'Departs Thursday',
-        image: 'https://images.unsplash.com/photo-1559511260-66a65e09b245?auto=format&fit=crop&w=600&q=80',
+        image: 'https://images.unsplash.com/photo-1559494007-9f5847c49d94?auto=format&fit=crop&w=600&q=80',
       },
     ],
   };
@@ -711,11 +804,57 @@ export default function App() {
   };
 
   const handlePrevDest = () => {
-    setActiveDestIndex((prev) => (prev === 0 ? destinations.length - 1 : prev - 1));
+    setActiveDestIndex((prev) => {
+      const nextIdx = prev === 0 ? destinations.length - 1 : prev - 1;
+      setSelectedPill(destinations[nextIdx]?.name || 'All');
+      return nextIdx;
+    });
   };
 
   const handleNextDest = () => {
-    setActiveDestIndex((prev) => (prev === destinations.length - 1 ? 0 : prev + 1));
+    setActiveDestIndex((prev) => {
+      const nextIdx = prev === destinations.length - 1 ? 0 : prev + 1;
+      setSelectedPill(destinations[nextIdx]?.name || 'All');
+      return nextIdx;
+    });
+  };
+
+  // Section 2: Touch Swipe Gesture Handlers for Mobile Carousel
+  const destTouchStartXRef = useRef<number | null>(null);
+  const destTouchStartYRef = useRef<number | null>(null);
+  const destTouchDeltaXRef = useRef<number>(0);
+
+  const handleDestTouchStart = (e: React.TouchEvent) => {
+    destTouchStartXRef.current = e.touches[0].clientX;
+    destTouchStartYRef.current = e.touches[0].clientY;
+    destTouchDeltaXRef.current = 0;
+    setIsDestCarouselHovered(true);
+  };
+
+  const handleDestTouchMove = (e: React.TouchEvent) => {
+    if (destTouchStartXRef.current === null) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - destTouchStartXRef.current;
+    const deltaY = currentY - (destTouchStartYRef.current || 0);
+    destTouchDeltaXRef.current = deltaX;
+  };
+
+  const handleDestTouchEnd = () => {
+    setIsDestCarouselHovered(false);
+    if (destTouchStartXRef.current === null) return;
+    const deltaX = destTouchDeltaXRef.current;
+    const swipeThreshold = 35;
+
+    if (deltaX < -swipeThreshold) {
+      handleNextDest();
+    } else if (deltaX > swipeThreshold) {
+      handlePrevDest();
+    }
+
+    destTouchStartXRef.current = null;
+    destTouchStartYRef.current = null;
+    destTouchDeltaXRef.current = 0;
   };
 
   const handlePillClick = (destName: string) => {
@@ -916,15 +1055,15 @@ export default function App() {
           )}
         </div>
 
-        {/* Mobile Right: Premium Hamburger Menu Button */}
+        {/* Mobile Right: Premium Hamburger Menu Button with Animated Spring Tap */}
         <div className="flex sm:hidden items-center gap-2">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            aria-label="Open mobile menu"
-            className="p-2 rounded-full border border-white/30 bg-white/10 hover:bg-white/20 transition-all text-white cursor-pointer"
-          >
-            <Menu className="w-6 h-6 text-white" />
-          </button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.5, ease: "easeOut" }}>
+            <AnimatedHamburgerButton
+              isOpen={isMobileMenuOpen}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              ariaLabel="Toggle mobile menu"
+            />
+          </motion.div>
         </div>
 
       </header>
@@ -934,7 +1073,7 @@ export default function App() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full min-h-[900px] lg:h-[920px] bg-transparent text-white relative flex flex-col justify-between overflow-hidden px-6 sm:px-10 lg:px-16 pt-24 sm:pt-28 pb-6 sm:pb-7 border-b border-white/10"
+        className="w-full min-h-[100dvh] lg:h-[920px] bg-transparent text-white relative flex flex-col justify-between overflow-hidden px-4 sm:px-10 lg:px-16 pt-20 sm:pt-28 pb-4 sm:pb-7 border-b border-white/10"
       >
 
         {/* 2. MAIN HERO AREA (Headline & CTAs on top, Two Cards side-by-side below) */}
@@ -947,7 +1086,7 @@ export default function App() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-white/30 bg-white/5 mb-3 backdrop-blur-sm"
+              className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1 rounded-full border border-white/30 bg-white/5 mb-2.5 sm:mb-3 backdrop-blur-sm"
             >
               <span className="text-white text-xs sm:text-sm font-light tracking-wider">
                 + Seamless flight booking. Instant confirmation.
@@ -959,7 +1098,7 @@ export default function App() {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-[66px] leading-[1.05] font-medium tracking-tight text-white mb-2.5"
+              className="text-3xl sm:text-5xl md:text-6xl lg:text-[66px] leading-[1.08] font-medium tracking-tight text-white mb-2 sm:mb-2.5"
             >
               Your next journey starts with Aerial.
             </motion.h1>
@@ -969,7 +1108,7 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
-              className="text-white text-base sm:text-lg md:text-xl font-light tracking-wide leading-relaxed max-w-2xl mb-4 sm:mb-5 opacity-90"
+              className="text-white text-sm sm:text-lg md:text-xl font-light tracking-wide leading-relaxed max-w-2xl mb-4 sm:mb-5 opacity-90"
             >
               Search flights, compare fares, and find a flight that fits your plans.
             </motion.p>
@@ -979,64 +1118,66 @@ export default function App() {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
-              className="flex flex-wrap items-center gap-3.5 sm:gap-5"
+              className="flex flex-row items-center gap-2.5 sm:gap-5 w-full sm:w-auto"
             >
               {/* Primary Search Flights CTA Button */}
               <button
                 onClick={() => {
                   offersSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="bg-white text-black font-normal text-base px-8 py-3 rounded-full flex items-center gap-3 hover:bg-neutral-200 transition-all cursor-pointer shadow-lg active:scale-95 group"
+                className="bg-white text-black font-normal text-xs sm:text-base px-5 sm:px-8 py-2.5 sm:py-3 rounded-full flex items-center justify-center gap-2 sm:gap-3 hover:bg-neutral-200 transition-all cursor-pointer shadow-lg active:scale-95 group shrink-0"
               >
                 <span>Search Flights</span>
-                <ArrowRight className="w-4 h-4 text-black stroke-[2.5] group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black stroke-[2.5] group-hover:translate-x-1 transition-transform" />
               </button>
 
               {/* Secondary Compare Fares CTA Button */}
               <button
                 onClick={() => setIsSearchFlightModalOpen(true)}
-                className="flex items-center gap-3 px-6 py-3 rounded-full border border-white/30 hover:border-white bg-white/5 hover:bg-white/10 transition-all text-white cursor-pointer group"
+                className="flex items-center justify-center gap-2 sm:gap-3 px-3.5 sm:px-6 py-2.5 sm:py-3 rounded-full border border-white/30 hover:border-white bg-white/5 hover:bg-white/10 transition-all text-white cursor-pointer group shrink-0"
               >
-                <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center">
-                  <Luggage className="w-3.5 h-3.5 text-white" />
+                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/15 flex items-center justify-center">
+                  <Luggage className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
                 </div>
-                <span className="text-white text-base font-normal tracking-wide">
+                <span className="text-white text-xs sm:text-base font-normal tracking-wide whitespace-nowrap">
                   Compare Fares
                 </span>
               </button>
             </motion.div>
           </div>
 
-          {/* TWO CARDS IN THE DOWN: Left Side Card 1 & Right Side Card 2 */}
+          {/* TWO CARDS IN THE DOWN: Left Side Card 1 & Right Side Card 2 (Two Sides, smaller on mobile) */}
           <motion.div
             initial={{ opacity: 0, y: 26 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
-            className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mt-6 sm:mt-8"
+            className="w-full grid grid-cols-2 gap-2.5 sm:gap-4 lg:gap-6 mt-4 sm:mt-8"
           >
             
             {/* LEFT SIDE: CARD 1 - Your Next Adventure Awaits */}
             <div
               onClick={() => setIsSearchFlightModalOpen(true)}
-              className="w-full rounded-2xl border border-white/20 hover:border-white/50 bg-white/[0.07] hover:bg-white/[0.12] backdrop-blur-xl p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer transition-all duration-300 group shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="w-full rounded-xl sm:rounded-2xl border border-white/20 hover:border-white/50 bg-white/[0.07] hover:bg-white/[0.12] backdrop-blur-xl p-2.5 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 cursor-pointer transition-all duration-300 group shadow-[0_8px_30px_rgba(0,0,0,0.5)] active:scale-[0.98]"
             >
-              {/* Left Circle Icon */}
-              <div className="w-12 h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <Compass className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Left Circle Icon */}
+                <div className="w-7 h-7 sm:w-12 sm:h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Compass className="w-3.5 h-3.5 sm:w-6 sm:h-6 text-white" />
+                </div>
+                <h3 className="text-white font-medium text-xs sm:text-base md:text-lg tracking-wide leading-tight sm:leading-snug whitespace-normal break-words">
+                  Your Next Adventure Awaits
+                </h3>
               </div>
 
               {/* Center Content */}
-              <div className="flex flex-col text-left flex-1 min-w-0">
-                <h3 className="text-white font-medium text-base sm:text-lg tracking-wide leading-snug">
-                  Your Next Adventure Awaits
-                </h3>
-                <p className="text-white/80 font-light text-xs sm:text-sm tracking-wide leading-relaxed mt-0.5">
-                  Discover new destinations and find the perfect flight for your next escape.
+              <div className="flex flex-col text-left flex-1 min-w-0 mt-1 sm:mt-0">
+                <p className="text-white/70 sm:text-white/80 font-light text-[10px] sm:text-xs md:text-sm tracking-wide leading-tight sm:leading-relaxed sm:line-clamp-2 mt-0.5">
+                  Discover new destinations and find the perfect flight for your escape.
                 </p>
               </div>
 
-              {/* Right Arrow Button */}
-              <div className="w-8 h-8 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-all">
+              {/* Right Arrow Button (desktop only for sleekness) */}
+              <div className="hidden sm:flex w-8 h-8 rounded-full bg-white/15 border border-white/25 items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-all">
                 <ArrowRight className="w-4 h-4 text-white group-hover:text-black transition-colors stroke-[2]" />
               </div>
             </div>
@@ -1044,25 +1185,27 @@ export default function App() {
             {/* RIGHT SIDE: CARD 2 - Less Planning. More Exploring. */}
             <div
               onClick={() => setIsSearchFlightModalOpen(true)}
-              className="w-full rounded-2xl border border-white/20 hover:border-white/50 bg-white/[0.07] hover:bg-white/[0.12] backdrop-blur-xl p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer transition-all duration-300 group shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+              className="w-full rounded-xl sm:rounded-2xl border border-white/20 hover:border-white/50 bg-white/[0.07] hover:bg-white/[0.12] backdrop-blur-xl p-2.5 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 cursor-pointer transition-all duration-300 group shadow-[0_8px_30px_rgba(0,0,0,0.5)] active:scale-[0.98]"
             >
-              {/* Left Circle Icon */}
-              <div className="w-12 h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <Plane className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Left Circle Icon */}
+                <div className="w-7 h-7 sm:w-12 sm:h-12 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Plane className="w-3.5 h-3.5 sm:w-6 sm:h-6 text-white" />
+                </div>
+                <h3 className="text-white font-medium text-xs sm:text-base md:text-lg tracking-wide leading-tight sm:leading-snug whitespace-normal break-words">
+                  Less Planning. More Exploring.
+                </h3>
               </div>
 
               {/* Center Content */}
-              <div className="flex flex-col text-left flex-1 min-w-0">
-                <h3 className="text-white font-medium text-base sm:text-lg tracking-wide leading-snug">
-                  Less Planning. More Exploring.
-                </h3>
-                <p className="text-white/80 font-light text-xs sm:text-sm tracking-wide leading-relaxed mt-0.5">
-                  Compare fares, book your flight, and bring your travel plans to life with Aerial.
+              <div className="flex flex-col text-left flex-1 min-w-0 mt-1 sm:mt-0">
+                <p className="text-white/70 sm:text-white/80 font-light text-[10px] sm:text-xs md:text-sm tracking-wide leading-tight sm:leading-relaxed sm:line-clamp-2 mt-0.5">
+                  Compare fares, book your flight, and bring your travel plans to life.
                 </p>
               </div>
 
-              {/* Right Arrow Button */}
-              <div className="w-8 h-8 rounded-full bg-white/15 border border-white/25 flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-all">
+              {/* Right Arrow Button (desktop only for sleekness) */}
+              <div className="hidden sm:flex w-8 h-8 rounded-full bg-white/15 border border-white/25 items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-all">
                 <ArrowRight className="w-4 h-4 text-white group-hover:text-black transition-colors stroke-[2]" />
               </div>
             </div>
@@ -1144,7 +1287,7 @@ export default function App() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.12 }}
         transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full bg-transparent text-white relative py-20 sm:py-28 px-4 sm:px-8 lg:px-16 overflow-hidden border-b border-white/10"
+        className="w-full bg-transparent text-white relative py-14 sm:py-28 px-3 sm:px-8 lg:px-16 overflow-hidden border-b border-white/10"
       >
         <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
 
@@ -1154,7 +1297,7 @@ export default function App() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-            className="text-xs sm:text-sm uppercase tracking-[0.25em] text-white/60 font-light mb-3 select-none"
+            className="text-[10px] sm:text-sm uppercase tracking-[0.25em] text-white/60 font-light mb-2.5 sm:mb-3 select-none"
           >
             GALLERY · FEATURED DESTINATIONS
           </motion.span>
@@ -1165,7 +1308,7 @@ export default function App() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight text-white mb-4"
+            className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight text-white mb-3 sm:mb-4"
           >
             Where will you go next?
           </motion.h2>
@@ -1176,7 +1319,7 @@ export default function App() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.18 }}
-            className="text-white/80 max-w-2xl text-base sm:text-lg md:text-xl font-light tracking-wide leading-relaxed mb-10"
+            className="text-white/80 max-w-2xl text-xs sm:text-lg md:text-xl font-light tracking-wide leading-relaxed mb-6 sm:mb-10 px-2"
           >
             From lively cities to peaceful seaside escapes, discover a destination for your next adventure.
           </motion.p>
@@ -1187,7 +1330,7 @@ export default function App() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.26 }}
-            className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-14 sm:mb-16 max-w-4xl px-2"
+            className="flex flex-nowrap overflow-x-auto sm:flex-wrap items-center sm:justify-center gap-2 sm:gap-3 mb-8 sm:mb-16 max-w-4xl px-2 w-full pb-1"
           >
             {['All', 'Dhaka', 'Bangkok', 'Dubai', 'Kuala Lumpur', 'Singapore'].map((item) => {
               const isActive = selectedPill === item;
@@ -1195,7 +1338,7 @@ export default function App() {
                 <button
                   key={item}
                   onClick={() => handlePillClick(item)}
-                  className={`px-5 sm:px-6 py-2 rounded-full text-sm sm:text-base font-normal tracking-wide transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                  className={`px-3.5 sm:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-base font-normal tracking-wide transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0 ${
                     isActive
                       ? 'bg-white text-black shadow-lg font-medium'
                       : 'border border-white/30 text-white hover:border-white hover:bg-white/10'
@@ -1209,16 +1352,19 @@ export default function App() {
             {/* View More Button pill matching reference */}
             <button
               onClick={() => setIsSearchFlightModalOpen(true)}
-              className="px-5 sm:px-6 py-2 rounded-full text-sm sm:text-base font-normal tracking-wide border border-white/40 text-white hover:border-white hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              className="px-3.5 sm:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-base font-normal tracking-wide border border-white/40 text-white hover:border-white hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
             >
               <span>View More</span>
-              <ArrowRight className="w-4 h-4 text-white" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </button>
           </motion.div>
 
-          {/* 3D / COVERFLOW CAROUSEL CONTAINER (MATCHING REFERENCE FOREGROUND LAYOUT) */}
+          {/* 3D / COVERFLOW CAROUSEL CONTAINER WITH TOUCH SWIPE (MATCHING REFERENCE FOREGROUND LAYOUT) */}
           <div 
-            className="relative w-full max-w-6xl mx-auto h-[480px] sm:h-[540px] md:h-[580px] flex items-center justify-center select-none"
+            onTouchStart={handleDestTouchStart}
+            onTouchMove={handleDestTouchMove}
+            onTouchEnd={handleDestTouchEnd}
+            className="relative w-full max-w-6xl mx-auto h-[410px] sm:h-[540px] md:h-[580px] flex items-center justify-center select-none touch-pan-y"
           >
             {destinations.map((dest, index) => {
               // Calculate relative position to active index
@@ -1232,7 +1378,7 @@ export default function App() {
               const isRight = offset === 1 || (offset > 0 && Math.abs(offset) === 1);
               const isFar = Math.abs(offset) > 1;
 
-              // Compute transforms for 3D layered coverflow layout exactly matching reference
+              // Compute transforms for 3D layered coverflow layout showing both sides cleanly on mobile
               let transformStyles = '';
               let zIndex = 10;
               let opacity = 1;
@@ -1242,19 +1388,19 @@ export default function App() {
                 zIndex = 30;
                 opacity = 1;
               } else if (isLeft) {
-                transformStyles = '-translate-x-[62%] sm:-translate-x-[72%] md:-translate-x-[80%] scale-90 z-20 shadow-xl';
+                transformStyles = '-translate-x-[64%] sm:-translate-x-[72%] md:-translate-x-[80%] scale-[0.88] sm:scale-90 z-20 shadow-xl';
                 zIndex = 20;
-                opacity = 0.7;
+                opacity = 0.75;
               } else if (isRight) {
-                transformStyles = 'translate-x-[62%] sm:translate-x-[72%] md:translate-x-[80%] scale-90 z-20 shadow-xl';
+                transformStyles = 'translate-x-[64%] sm:translate-x-[72%] md:translate-x-[80%] scale-[0.88] sm:scale-90 z-20 shadow-xl';
                 zIndex = 20;
-                opacity = 0.7;
+                opacity = 0.75;
               } else {
                 transformStyles = offset < 0
-                  ? '-translate-x-[115%] sm:-translate-x-[135%] md:-translate-x-[150%] scale-80 z-10'
-                  : 'translate-x-[115%] sm:translate-x-[135%] md:translate-x-[150%] scale-80 z-10';
+                  ? '-translate-x-[110%] sm:-translate-x-[135%] md:-translate-x-[150%] scale-75 sm:scale-80 z-10'
+                  : 'translate-x-[110%] sm:translate-x-[135%] md:translate-x-[150%] scale-75 sm:scale-80 z-10';
                 zIndex = 10;
-                opacity = isFar ? 0.45 : 0;
+                opacity = isFar ? 0.35 : 0;
               }
 
               return (
@@ -1270,9 +1416,9 @@ export default function App() {
                   }}
                   onMouseEnter={() => setIsDestCarouselHovered(true)}
                   onMouseLeave={() => setIsDestCarouselHovered(false)}
-                  className={`absolute top-0 transition-all duration-500 ease-out cursor-pointer rounded-3xl overflow-hidden border border-white/20 bg-neutral-950 group ${transformStyles}`}
+                  className={`absolute top-0 transition-all duration-500 ease-out cursor-pointer rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-neutral-950 group ${transformStyles}`}
                   style={{
-                    width: 'min(90vw, 360px)',
+                    width: 'clamp(235px, 68vw, 360px)',
                     height: '100%',
                     opacity: opacity,
                     zIndex: zIndex,
@@ -1298,25 +1444,25 @@ export default function App() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/10" />
 
                     {/* Card Content Overlay */}
-                    <div className="absolute inset-0 p-6 flex flex-col justify-between text-left">
+                    <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-between text-left">
                       {/* Top destination badge */}
                       <div className="flex items-center justify-between">
-                        <span className="px-3 py-1 rounded-full bg-transparent/60 border border-white/25 backdrop-blur-md text-xs tracking-wider uppercase text-white font-normal">
+                        <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-transparent/60 border border-white/25 backdrop-blur-md text-[10px] sm:text-xs tracking-wider uppercase text-white font-normal">
                           {dest.country}
                         </span>
 
-                        <div className="px-3 py-1 rounded-full bg-white/20 border border-white/30 backdrop-blur-md text-xs text-white">
+                        <div className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-white/20 border border-white/30 backdrop-blur-md text-[10px] sm:text-xs text-white">
                           From {dest.startingFare}
                         </div>
                       </div>
 
                       {/* Bottom details with expanded hover state */}
                       <div className="relative overflow-hidden group-hover:bg-transparent">
-                        <h3 className="text-3xl sm:text-4xl font-medium tracking-tight text-white mb-2 leading-none">
+                        <h3 className="text-2xl sm:text-4xl font-medium tracking-tight text-white mb-1.5 sm:mb-2 leading-tight">
                           {dest.name}
                         </h3>
 
-                        <p className="text-white/90 text-sm sm:text-base font-light tracking-wide line-clamp-3 mb-4 leading-relaxed group-hover:line-clamp-none transition-all duration-300">
+                        <p className="text-white/90 text-xs sm:text-base font-light tracking-wide line-clamp-2 sm:line-clamp-3 mb-2.5 sm:mb-4 leading-relaxed group-hover:line-clamp-none transition-all duration-300">
                           {dest.subtext}
                         </p>
                         
@@ -1349,8 +1495,8 @@ export default function App() {
                           </button>
 
                           {/* Circular video / action play button matching reference image */}
-                          <div className="w-9 h-9 rounded-full bg-white/20 hover:bg-white text-white hover:text-black border border-white/40 flex items-center justify-center transition-all cursor-pointer">
-                            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 hover:bg-white text-white hover:text-black border border-white/40 flex items-center justify-center transition-all cursor-pointer shrink-0">
+                            <Play className="w-3 sm:w-3.5 h-3 sm:h-3.5 fill-current ml-0.5" />
                           </div>
                         </div>
                       </div>
@@ -1391,39 +1537,39 @@ export default function App() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.12 }}
         transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full bg-transparent text-white relative py-20 sm:py-28 px-6 sm:px-10 lg:px-16 border-b border-white/10 overflow-hidden"
+        className="w-full bg-transparent text-white relative py-14 sm:py-28 px-4 sm:px-10 lg:px-16 border-b border-white/10 overflow-hidden"
       >
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
 
             {/* LEFT COLUMN: Section Label, Heading, Subtext, Offer Categories, Button & Special Offers Cards */}
             <div className="lg:col-span-7 flex flex-col justify-between">
 
               <div>
                 {/* Section Label */}
-                <span className="text-xs sm:text-sm uppercase tracking-[0.25em] text-white/60 font-light mb-3 select-none block">
+                <span className="text-[10px] sm:text-sm uppercase tracking-[0.25em] text-white/60 font-light mb-2 sm:mb-3 select-none block">
                   Flight Offers
                 </span>
 
                 {/* Heading */}
-                <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-white mb-4 leading-[1.08]">
+                <h2 className="text-3xl sm:text-5xl md:text-6xl font-medium tracking-tight text-white mb-2.5 sm:mb-4 leading-[1.08]">
                   New places. More possibilities.
                 </h2>
 
                 {/* Subtext */}
-                <p className="text-white/80 max-w-xl text-base sm:text-lg font-light tracking-wide leading-relaxed mb-6">
+                <p className="text-white/80 max-w-xl text-xs sm:text-lg font-light tracking-wide leading-relaxed mb-4 sm:mb-6">
                   Explore featured fares for your next getaway. Choose your dates to see current prices and availability.
                 </p>
 
                 {/* Offer Categories Tabs */}
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-6">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-5 sm:mb-6">
                   {['Weekend Getaways', 'International Adventures', 'Last-Minute Trips'].map((category, idx) => {
                     const isSelected = selectedOfferCategory === category;
                     return (
                       <React.Fragment key={category}>
                         <button
                           onClick={() => setSelectedOfferCategory(category)}
-                          className={`text-sm sm:text-base font-normal tracking-wide transition-all cursor-pointer py-1 ${
+                          className={`text-xs sm:text-base font-normal tracking-wide transition-all cursor-pointer py-1 ${
                             isSelected
                               ? 'text-white border-b-2 border-white font-medium'
                               : 'text-white/60 hover:text-white'
@@ -1431,36 +1577,36 @@ export default function App() {
                         >
                           {category}
                         </button>
-                        {idx < 2 && <span className="text-white/30 text-sm select-none font-bold">·</span>}
+                        {idx < 2 && <span className="text-white/30 text-xs sm:text-sm select-none font-bold">·</span>}
                       </React.Fragment>
                     );
                   })}
                 </div>
 
                 {/* Button: View Flight Offers */}
-                <div className="mb-10 sm:mb-12">
+                <div className="mb-6 sm:mb-12">
                   <button
                     onClick={() => setIsSearchFlightModalOpen(true)}
-                    className="inline-flex items-center gap-2.5 px-7 py-3 rounded-full border border-white text-white hover:bg-white hover:text-black transition-all cursor-pointer font-normal text-sm sm:text-base tracking-wide active:scale-95 group shadow-lg"
+                    className="inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-full border border-white text-white hover:bg-white hover:text-black transition-all cursor-pointer font-normal text-xs sm:text-base tracking-wide active:scale-95 group shadow-lg"
                   >
                     <span>View Flight Offers</span>
-                    <ArrowRight className="w-4 h-4 text-white group-hover:text-black transition-colors stroke-[2]" />
+                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white group-hover:text-black transition-colors stroke-[2]" />
                   </button>
                 </div>
               </div>
 
-              {/* Special Offers Cards Row (Matching Bottom-Left of Reference) */}
-              <div className="w-full pt-4">
-                <div className="flex items-center justify-between mb-4">
+              {/* Special Offers Cards Row: Two Sides, Smaller on Mobile */}
+              <div className="w-full pt-2 sm:pt-4">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <span className="text-xs sm:text-sm uppercase tracking-wider text-white/80 font-normal">
                     Special Offers
                   </span>
-                  <span className="text-xs text-white/50">
+                  <span className="text-[10px] sm:text-xs text-white/50">
                     {selectedOfferCategory}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
                   {specialOffersData[selectedOfferCategory]?.map((offer) => (
                     <div
                       key={offer.id}
@@ -1469,30 +1615,30 @@ export default function App() {
                         setBookingDestCity(offer.destination);
                         setIsSearchFlightModalOpen(true);
                       }}
-                      className="rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-md p-3.5 flex flex-col justify-between hover:border-white/50 hover:bg-white/[0.1] transition-all cursor-pointer group shadow-xl"
+                      className="rounded-xl sm:rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-md p-2.5 sm:p-3.5 flex flex-col justify-between hover:border-white/50 hover:bg-white/[0.1] transition-all cursor-pointer group shadow-xl active:scale-[0.98]"
                     >
-                      <div className="flex gap-3 items-center mb-3">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center mb-2 sm:mb-3">
                         <img
                           src={offer.image}
                           alt={offer.destination}
                           referrerPolicy="no-referrer"
-                          className="w-16 h-16 rounded-xl object-cover shrink-0 border border-white/15 group-hover:scale-105 transition-transform"
+                          className="w-full sm:w-16 h-20 sm:h-16 rounded-lg sm:rounded-xl object-cover shrink-0 border border-white/15 group-hover:scale-105 transition-transform"
                         />
                         <div className="min-w-0">
-                          <h4 className="text-white font-medium text-sm sm:text-base truncate">
+                          <h4 className="text-white font-medium text-xs sm:text-base truncate">
                             {offer.destination} ({offer.code})
                           </h4>
-                          <p className="text-white/60 text-xs truncate">
+                          <p className="text-white/60 text-[10px] sm:text-xs truncate">
                             {offer.origin}
                           </p>
-                          <span className="text-xs text-white/40 block mt-0.5">
+                          <span className="text-[10px] sm:text-xs text-white/40 block mt-0.5 truncate">
                             {offer.dates}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                        <span className="text-lg font-medium text-white tracking-tight">
+                      <div className="flex items-center justify-between pt-1.5 sm:pt-2 border-t border-white/10">
+                        <span className="text-xs sm:text-lg font-medium text-white tracking-tight">
                           {offer.price}
                         </span>
                         <button
@@ -1504,7 +1650,7 @@ export default function App() {
                             setBookingDuplicateError(null);
                             setIsSearchFlightModalOpen(true);
                           }}
-                          className="px-3 py-1 rounded-full bg-white text-black text-xs font-medium hover:bg-neutral-200 transition-colors uppercase tracking-wider cursor-pointer"
+                          className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-white text-black text-[10px] sm:text-xs font-medium hover:bg-neutral-200 transition-colors uppercase tracking-wider cursor-pointer"
                         >
                           Book Now
                         </button>
@@ -1518,16 +1664,16 @@ export default function App() {
 
             {/* RIGHT COLUMN: Book a Flight Glassmorphic Card (Matching Reference Right Column) */}
             <div className="lg:col-span-5 w-full">
-              <div className="rounded-3xl border border-white/20 bg-white/[0.06] backdrop-blur-xl p-6 sm:p-8 shadow-2xl relative">
+              <div className="rounded-2xl sm:rounded-3xl border border-white/20 bg-white/[0.06] backdrop-blur-xl p-4 sm:p-8 shadow-2xl relative">
 
                 {/* Card Title */}
                 <h3 className="text-2xl sm:text-3xl font-normal text-white mb-6 tracking-wide">
                   Book a Flight
                 </h3>
 
-                {/* Trip Type Selector (One-way, Round Trip, Multi City) */}
-                <div className="grid grid-cols-3 gap-2 mb-6">
-                  {(['One-way', 'Round Trip', 'Multi City'] as const).map((type) => {
+                {/* Trip Type Selector (One-way, Round Trip) */}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  {(['One-way', 'Round Trip'] as const).map((type) => {
                     const isSelected = bookingTripType === type;
                     return (
                       <button
@@ -1698,9 +1844,34 @@ export default function App() {
                 {/* Primary Action Button: Check Availability */}
                 <button
                   onClick={() => {
-                    setBookingOriginInput(`${bookingOriginCity} (${bookingOriginCode})`);
-                    setBookingDestInput(`${bookingDestCity} (${bookingDestCode})`);
-                    setBookingDateInput('2026-05-28');
+                    const locOrigin = websiteLocations.find(l => l.code === bookingOriginCode) || websiteLocations[0];
+                    const locDest = websiteLocations.find(l => l.code === bookingDestCode) || websiteLocations[1];
+                    setBookingOriginInput(locOrigin.fullName);
+                    setBookingDestInput(locDest.fullName);
+                    
+                    try {
+                      const d = new Date(bookingDepartDate);
+                      if (!isNaN(d.getTime())) setBookingDateInput(d.toISOString().split('T')[0]);
+                    } catch (e) {}
+                    
+                    if (bookingTripType === 'Round Trip') {
+                      try {
+                        const r = new Date(bookingReturnDate);
+                        if (!isNaN(r.getTime())) setBookingReturnDateInput(r.toISOString().split('T')[0]);
+                      } catch (e) {}
+                    }
+                    
+                    setBookingPassengerSelect(`${bookingPassengers} ${bookingPassengers === 1 ? 'Adult' : 'Adults'}, ${bookingCabinClass}`);
+                    setModalTripType(bookingTripType);
+
+                    setAppliedFilters({
+                      originCode: bookingOriginCode,
+                      destCode: bookingDestCode,
+                      passengers: bookingPassengers,
+                      cabinClass: bookingCabinClass,
+                      timestamp: Date.now()
+                    });
+
                     setBookingStep('search');
                     setBookingDuplicateError(null);
                     setIsSearchFlightModalOpen(true);
@@ -1725,37 +1896,37 @@ export default function App() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.12 }}
         transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full bg-transparent text-white relative py-20 sm:py-28 px-6 sm:px-10 lg:px-16 border-b border-white/10 overflow-hidden"
+        className="w-full bg-transparent text-white relative py-14 sm:py-28 px-4 sm:px-10 lg:px-16 border-b border-white/10 overflow-hidden"
       >
         <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
 
           {/* Label matching reference header */}
-          <span className="text-xs sm:text-sm uppercase tracking-[0.25em] text-white/60 font-light mb-2 block select-none">
+          <span className="text-[10px] sm:text-sm uppercase tracking-[0.25em] text-white/60 font-light mb-2 block select-none">
             My Bookings
           </span>
 
           {/* Heading */}
-          <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-white mb-3">
+          <h2 className="text-3xl sm:text-5xl md:text-6xl font-medium tracking-tight text-white mb-2.5 sm:mb-3">
             Your travel plans, all in one place.
           </h2>
 
           {/* Subtext */}
-          <p className="text-white/80 max-w-xl text-base sm:text-lg font-light tracking-wide leading-relaxed mb-8 sm:mb-10">
+          <p className="text-white/80 max-w-xl text-xs sm:text-lg font-light tracking-wide leading-relaxed mb-6 sm:mb-10 px-2">
             View your upcoming flights, check booking details, and access your itinerary.
           </p>
 
           {/* CONTENT: Real Bookings or Initial Empty State */}
           {myBookings.length > 0 ? (
             /* 2x2 Grid of real confirmed bookings */
-            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 text-left mb-10">
+            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 text-left mb-10">
               {myBookings.map((booking) => (
                 <div
                   key={booking.id}
                   onClick={() => setSelectedBookingForItinerary(booking)}
-                  className="rounded-2xl border border-white/20 bg-white/[0.05] hover:bg-white/[0.09] hover:border-white/40 backdrop-blur-xl p-5 sm:p-6 transition-all flex items-center gap-5 sm:gap-6 shadow-xl group cursor-pointer relative"
+                  className="rounded-xl sm:rounded-2xl border border-white/20 bg-white/[0.05] hover:bg-white/[0.09] hover:border-white/40 backdrop-blur-xl p-3.5 sm:p-6 transition-all flex items-center gap-3.5 sm:gap-6 shadow-xl group cursor-pointer relative active:scale-[0.99]"
                 >
                   {/* Left: Circular Image Mask matching reference */}
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden shrink-0 border-2 border-white/25 group-hover:border-white transition-all shadow-lg">
+                  <div className="w-16 h-16 sm:w-28 sm:h-28 rounded-full overflow-hidden shrink-0 border-2 border-white/25 group-hover:border-white transition-all shadow-lg">
                     <img
                       src={booking.image}
                       alt={booking.destination}
@@ -1869,16 +2040,16 @@ export default function App() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.12 }}
         transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full bg-transparent text-white relative py-20 sm:py-28 px-6 sm:px-10 lg:px-16 border-b border-white/10 overflow-hidden"
+        className="w-full bg-transparent text-white relative py-14 sm:py-28 px-4 sm:px-10 lg:px-16 border-b border-white/10 overflow-hidden"
       >
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
 
             {/* LEFT COLUMN: Headings, Texts, Subheading, and Action Buttons */}
             <div className="lg:col-span-7 flex flex-col items-start max-w-2xl">
 
               {/* Tag / Pill matching reference (New · Travel Beyond Expectations) */}
-              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-white/25 bg-white/5 mb-6 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-white/25 bg-white/5 mb-4 sm:mb-6 backdrop-blur-sm">
                 <span className="px-2 py-0.5 rounded-full bg-white text-black text-xs font-normal">
                   About
                 </span>
@@ -1888,45 +2059,45 @@ export default function App() {
               </div>
 
               {/* Requested Heading */}
-              <h2 className="text-5xl sm:text-6xl md:text-7xl lg:text-[76px] font-medium tracking-tight text-white mb-6 leading-[1.04]">
+              <h2 className="text-4xl sm:text-6xl md:text-7xl lg:text-[76px] font-medium tracking-tight text-white mb-3.5 sm:mb-6 leading-[1.04]">
                 Meet Aerial.
               </h2>
 
               {/* Requested Text */}
-              <p className="text-white/80 text-base sm:text-lg md:text-xl font-light tracking-wide leading-relaxed mb-8">
+              <p className="text-white/80 text-sm sm:text-lg md:text-xl font-light tracking-wide leading-relaxed mb-5 sm:mb-8">
                 Aerial brings flight search and booking together in a simple, easy-to-use experience—helping you spend less time planning and more time looking forward to your journey.
               </p>
 
               {/* Subtle divider */}
-              <div className="w-full border-t border-white/15 my-4 max-w-xl" />
+              <div className="w-full border-t border-white/15 my-3 sm:my-4 max-w-xl" />
 
               {/* Requested Subheading */}
-              <h3 className="text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-white mt-4 mb-3">
+              <h3 className="text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-white mt-3 sm:mt-4 mb-2 sm:mb-3">
                 Need a hand?
               </h3>
 
               {/* Requested Subheading Text */}
-              <p className="text-white/80 text-base sm:text-lg font-light tracking-wide leading-relaxed mb-8 max-w-xl">
+              <p className="text-white/80 text-sm sm:text-lg font-light tracking-wide leading-relaxed mb-5 sm:mb-8 max-w-xl">
                 Have a question about your booking or using Aerial? Get in touch with our team.
               </p>
 
               {/* Requested Buttons: Contact Us · Browse FAQs */}
-              <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+              <div className="flex flex-row items-center gap-3 sm:gap-6 w-full sm:w-auto">
                 {/* Contact Us Button matching reference arrow style */}
                 <button
                   onClick={() => setIsContactModalOpen(true)}
-                  className="bg-white text-black font-normal text-base px-8 py-3.5 rounded-full flex items-center gap-2.5 hover:bg-neutral-200 transition-all cursor-pointer shadow-lg active:scale-95 group"
+                  className="bg-white text-black font-normal text-xs sm:text-base px-6 sm:px-8 py-2.5 sm:py-3.5 rounded-full flex items-center justify-center gap-2 sm:gap-2.5 hover:bg-neutral-200 transition-all cursor-pointer shadow-lg active:scale-95 group shrink-0"
                 >
                   <span>Contact Us</span>
-                  <ArrowRight className="w-4 h-4 text-black stroke-[2.5] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black stroke-[2.5] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </button>
 
                 {/* Browse FAQs Button */}
                 <button
                   onClick={() => setIsFaqModalOpen(true)}
-                  className="flex items-center gap-2.5 px-7 py-3.5 rounded-full border border-white/30 hover:border-white bg-white/5 hover:bg-white/10 transition-all text-white font-normal text-base cursor-pointer shadow-md active:scale-95"
+                  className="flex items-center justify-center gap-2 sm:gap-2.5 px-5 sm:px-7 py-2.5 sm:py-3.5 rounded-full border border-white/30 hover:border-white bg-white/5 hover:bg-white/10 transition-all text-white font-normal text-xs sm:text-base cursor-pointer shadow-md active:scale-95 shrink-0"
                 >
-                  <HelpCircle className="w-4 h-4 text-white/80" />
+                  <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/80" />
                   <span>Browse FAQs</span>
                 </button>
               </div>
@@ -1934,10 +2105,10 @@ export default function App() {
             </div>
 
             {/* RIGHT COLUMN: ORBITAL DESTINATION BUBBLE CAROUSEL MATCHING REFERENCE */}
-            <div className="lg:col-span-5 flex items-center justify-center lg:justify-end relative py-6">
+            <div className="lg:col-span-5 flex items-center justify-center lg:justify-end relative py-4 sm:py-6 w-full">
 
               {/* Vertical bubble arc container */}
-              <div className="relative flex flex-col items-end gap-3 sm:gap-4 w-full max-w-[420px]">
+              <div className="relative flex flex-col items-end gap-3 sm:gap-4 w-full max-w-[340px] sm:max-w-[420px]">
                 {orbitalDestinations.map((dest, idx) => {
                   const isActive = activeBubbleIndex === idx;
 
@@ -2086,23 +2257,28 @@ export default function App() {
 
       {/* MOBILE HAMBURGER MENU DRAWER */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-transparent/95 backdrop-blur-xl flex flex-col justify-between p-6">
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -16 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-6 sm:hidden"
+        >
           <div className="flex items-center justify-between border-b border-white/20 pb-4">
             <div className="flex items-center">
               <span className="font-nevera text-2xl tracking-wider uppercase text-white">
                 Aerial
               </span>
             </div>
-            <button
+            <AnimatedHamburgerButton
+              isOpen={true}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-2 text-white hover:opacity-70 cursor-pointer"
-            >
-              <X className="w-6 h-6 text-white" />
-            </button>
+              ariaLabel="Close mobile menu"
+            />
           </div>
 
           {/* Navigation Links */}
-          <div className="flex flex-col gap-6 my-auto py-8">
+          <div className="flex flex-col gap-5 my-auto py-6">
             {navItems.map((item) => (
               <button
                 key={item}
@@ -2111,7 +2287,7 @@ export default function App() {
                   setIsMobileMenuOpen(false);
                 }}
                 className={`text-2xl text-left font-normal tracking-wide transition-colors ${
-                  activeNav === item ? 'text-white underline underline-offset-8' : 'text-white/70'
+                  activeNav === item ? 'text-white underline underline-offset-8 font-medium' : 'text-white/70 hover:text-white'
                 }`}
               >
                 {item}
@@ -2129,7 +2305,7 @@ export default function App() {
                     setAuthMode('login');
                     setIsAuthModalOpen(true);
                   }}
-                  className="w-full py-3 rounded-full border border-white/40 text-white font-normal text-base hover:bg-white/10"
+                  className="w-full py-3 rounded-full border border-white/40 text-white font-normal text-base hover:bg-white/10 active:scale-95 transition-all"
                 >
                   Log In
                 </button>
@@ -2139,7 +2315,7 @@ export default function App() {
                     setAuthMode('signup');
                     setIsAuthModalOpen(true);
                   }}
-                  className="w-full py-3 rounded-full bg-white text-black font-normal text-base hover:bg-neutral-200"
+                  className="w-full py-3 rounded-full bg-white text-black font-normal text-base hover:bg-neutral-200 active:scale-95 transition-all"
                 >
                   Sign Up
                 </button>
@@ -2167,7 +2343,7 @@ export default function App() {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* LOGIN / SIGN UP MODAL */}
@@ -2286,12 +2462,19 @@ export default function App() {
       )}
 
       {/* FLIGHT SEARCH & BOOKING ENGINE MODAL (PREMIUM 2-SIDED COMPACT GLASSMORPHISM) */}
+      <AnimatePresence>
       {isSearchFlightModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-6 animate-modal-backdrop transition-all">
-          <div className="w-full max-w-5xl bg-white/10 backdrop-blur-3xl border border-white/30 rounded-3xl p-5 sm:p-7 relative shadow-[0_24px_80px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.4)] max-h-[92vh] overflow-y-auto animate-modal-card">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4 }}
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-3xl flex flex-col items-center p-0 animate-modal-backdrop transition-all overflow-y-auto"
+        >
+          <div className="w-full min-h-screen max-w-7xl mx-auto bg-transparent border-none rounded-none p-6 sm:p-10 relative">
             
             {/* Header: Brand & Step Breadcrumbs & Close */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-white/10 relative">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-5 border-b border-white/10 relative">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-2xl bg-white/10 border border-white/20 shadow-inner flex items-center justify-center">
                   <PlushyAirplaneLogo className="w-6 h-6 text-white" />
@@ -2313,8 +2496,8 @@ export default function App() {
               </div>
 
               {/* Step indicator breadcrumbs */}
-              <div className="flex items-center gap-2 text-xs font-light tracking-wider mr-10 sm:mr-12">
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-light tracking-wider w-full overflow-x-auto no-scrollbar whitespace-nowrap pb-1 sm:pb-0 shrink-0">
+                <div className={`flex shrink-0 items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
                   bookingStep === 'search'
                     ? 'bg-white text-black font-normal border-white shadow-sm'
                     : 'bg-white/5 text-white/60 border-white/15'
@@ -2322,8 +2505,8 @@ export default function App() {
                   <span className="font-mono text-[10px]">01</span>
                   <span>Flights</span>
                 </div>
-                <span className="text-white/30">→</span>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+                <span className="text-white/30 shrink-0">→</span>
+                <div className={`flex shrink-0 items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
                   bookingStep === 'seats'
                     ? 'bg-white text-black font-normal border-white shadow-sm'
                     : 'bg-white/5 text-white/60 border-white/15'
@@ -2331,8 +2514,8 @@ export default function App() {
                   <span className="font-mono text-[10px]">02</span>
                   <span>Seat</span>
                 </div>
-                <span className="text-white/30">→</span>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+                <span className="text-white/30 shrink-0">→</span>
+                <div className={`flex shrink-0 items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
                   bookingStep === 'confirm'
                     ? 'bg-white text-black font-normal border-white shadow-sm'
                     : 'bg-white/5 text-white/60 border-white/15'
@@ -2340,8 +2523,8 @@ export default function App() {
                   <span className="font-mono text-[10px]">03</span>
                   <span>Review</span>
                 </div>
-                <span className="text-white/30">→</span>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+                <span className="text-white/30 shrink-0">→</span>
+                <div className={`flex shrink-0 items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
                   bookingStep === 'payment'
                     ? 'bg-white text-black font-normal border-white shadow-sm'
                     : 'bg-white/5 text-white/60 border-white/15'
@@ -2349,8 +2532,8 @@ export default function App() {
                   <span className="font-mono text-[10px]">04</span>
                   <span>Payment</span>
                 </div>
-                <span className="text-white/30">→</span>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${
+                <span className="text-white/30 shrink-0">→</span>
+                <div className={`flex shrink-0 items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
                   bookingStep === 'success'
                     ? 'bg-white text-black font-normal border-white shadow-sm'
                     : 'bg-white/5 text-white/60 border-white/15'
@@ -2379,29 +2562,9 @@ export default function App() {
                 
                 {/* LEFT SIDE: SEARCH & ROUTE CONTROLS (col-span-12 lg:col-span-5) */}
                 <div className="lg:col-span-5 space-y-3.5">
-                  {/* Trip Type Tabs */}
-                  <div className="flex items-center p-1 rounded-2xl bg-white/[0.06] border border-white/15 backdrop-blur-xl">
-                    {(['Round Trip', 'One-way'] as const).map((type) => {
-                      const active = modalTripType === type;
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setModalTripType(type)}
-                          className={`flex-1 py-1.5 text-xs font-normal uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
-                            active
-                              ? 'bg-white text-black shadow-md font-medium'
-                              : 'text-white/70 hover:text-white'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      );
-                    })}
-                  </div>
 
                   {/* Route Card: Origin & Destination with interactive swap button */}
-                  <div className="p-4 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-2xl shadow-xl relative space-y-3">
+                  <div className="p-4 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-2xl shadow-xl relative space-y-3 z-[60]">
                     
                     {/* Departure Origin */}
                     <div className="text-left">
@@ -2414,25 +2577,40 @@ export default function App() {
                           {bookingOriginInput.match(/\(([A-Z]{3})\)/)?.[1] || 'SFO'}
                         </span>
                       </div>
-                      <select
-                        value={bookingOriginInput}
-                        onChange={(e) => {
-                          setBookingOriginInput(e.target.value);
-                          const loc = websiteLocations.find(l => l.fullName === e.target.value);
-                          if (loc) {
-                            setBookingOriginCode(loc.code);
-                            setBookingOriginCity(loc.city);
-                          }
-                        }}
-                        className="w-full bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/40 focus:border-white rounded-xl px-3 py-2 text-white text-sm sm:text-base font-medium focus:outline-none backdrop-blur-md transition-all cursor-pointer font-['Oswald']"
-                      >
-                        {websiteLocations.map((loc) => (
-                          <option key={`modal-from-${loc.code}`} value={loc.fullName} className="bg-neutral-950 text-white py-1">
-                            {loc.city} ({loc.code}) · {loc.country}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="text-[11px] text-white/45 block mt-1 font-light truncate">
+                      <div className="relative z-[60]">
+                        <div
+                          onClick={() => setIsOriginDropdownOpen(!isOriginDropdownOpen)}
+                          className="w-full bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/40 focus:border-white rounded-xl px-4 py-2 text-left backdrop-blur-md transition-all cursor-pointer font-['Oswald']"
+                        >
+                          <div className="text-white text-base font-medium leading-tight">
+                            {websiteLocations.find(l => l.fullName === bookingOriginInput)?.country || 'Country'}
+                          </div>
+                          <div className="text-white/50 text-sm font-light mt-0.5">
+                            {websiteLocations.find(l => l.fullName === bookingOriginInput)?.city || 'City'} ({bookingOriginInput.match(/\(([A-Z]{3})\)/)?.[1] || ''})
+                          </div>
+                        </div>
+                        
+                        {isOriginDropdownOpen && (
+                          <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-neutral-900/90 backdrop-blur-xl border border-white/20 rounded-xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto">
+                            {websiteLocations.map((loc) => (
+                              <div
+                                key={`modal-from-${loc.code}`}
+                                onClick={() => {
+                                  setBookingOriginInput(loc.fullName);
+                                  setBookingOriginCode(loc.code);
+                                  setBookingOriginCity(loc.city);
+                                  setIsOriginDropdownOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
+                              >
+                                <div className="text-white text-base font-medium leading-tight">{loc.country}</div>
+                                <div className="text-white/50 text-sm font-light">{loc.city} ({loc.code})</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-white/45 block mt-2 font-light truncate">
                         {websiteLocations.find(l => l.fullName === bookingOriginInput)?.airport || 'Airport Terminal'}
                       </span>
                     </div>
@@ -2478,50 +2656,80 @@ export default function App() {
                           {bookingDestInput.match(/\(([A-Z]{3})\)/)?.[1] || 'NRT'}
                         </span>
                       </div>
-                      <select
-                        value={bookingDestInput}
-                        onChange={(e) => {
-                          setBookingDestInput(e.target.value);
-                          const loc = websiteLocations.find(l => l.fullName === e.target.value);
-                          if (loc) {
-                            setBookingDestCode(loc.code);
-                            setBookingDestCity(loc.city);
-                          }
-                        }}
-                        className="w-full bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/40 focus:border-white rounded-xl px-3 py-2 text-white text-sm sm:text-base font-medium focus:outline-none backdrop-blur-md transition-all cursor-pointer font-['Oswald']"
-                      >
-                        {websiteLocations.map((loc) => (
-                          <option key={`modal-to-${loc.code}`} value={loc.fullName} className="bg-neutral-950 text-white py-1">
-                            {loc.city} ({loc.code}) · {loc.country}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="text-[11px] text-white/45 block mt-1 font-light truncate">
+                      <div className="relative z-50">
+                        <div
+                          onClick={() => setIsDestDropdownOpen(!isDestDropdownOpen)}
+                          className="w-full bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/40 focus:border-white rounded-xl px-4 py-2 text-left backdrop-blur-md transition-all cursor-pointer font-['Oswald']"
+                        >
+                          <div className="text-white text-base font-medium leading-tight">
+                            {websiteLocations.find(l => l.fullName === bookingDestInput)?.country || 'Country'}
+                          </div>
+                          <div className="text-white/50 text-sm font-light mt-0.5">
+                            {websiteLocations.find(l => l.fullName === bookingDestInput)?.city || 'City'} ({bookingDestInput.match(/\(([A-Z]{3})\)/)?.[1] || ''})
+                          </div>
+                        </div>
+                        
+                        {isDestDropdownOpen && (
+                          <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-neutral-900/90 backdrop-blur-xl border border-white/20 rounded-xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto">
+                            {websiteLocations.map((loc) => (
+                              <div
+                                key={`modal-to-${loc.code}`}
+                                onClick={() => {
+                                  setBookingDestInput(loc.fullName);
+                                  setBookingDestCode(loc.code);
+                                  setBookingDestCity(loc.city);
+                                  setIsDestDropdownOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 transition-colors"
+                              >
+                                <div className="text-white text-base font-medium leading-tight">{loc.country}</div>
+                                <div className="text-white/50 text-sm font-light">{loc.city} ({loc.code})</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-white/45 block mt-2 font-light truncate">
                         {websiteLocations.find(l => l.fullName === bookingDestInput)?.airport || 'Airport Terminal'}
                       </span>
                     </div>
 
                   </div>
 
-                  {/* Date & Travelers Row */}
-                  <div className={`grid gap-3 ${modalTripType === 'Round Trip' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                    <div className="p-3 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-xl">
-                      <label className="block text-[10px] uppercase tracking-wider text-white/60 mb-1 font-light flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-white/50 shrink-0" />
-                        <span className="truncate">{modalTripType === 'Round Trip' ? 'Departure' : 'Date'}</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={bookingDateInput}
-                        onChange={(e) => setBookingDateInput(e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-white text-xs sm:text-sm focus:outline-none focus:border-white font-['Oswald'] backdrop-blur-md cursor-pointer"
-                      />
-                    </div>
+                  {/* Date & Travelers Row restructured for Mobile */}
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                      {/* Trip Type */}
+                      <div className="p-2 sm:p-3 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-xl flex flex-col justify-center">
+                        <label className="block text-[9px] sm:text-[10px] uppercase tracking-wider text-white/60 mb-1 font-light truncate">Trip</label>
+                        <select 
+                          value={modalTripType} 
+                          onChange={(e) => setModalTripType(e.target.value as any)}
+                          className="w-full bg-white/10 border border-white/20 rounded-lg sm:rounded-xl px-1 sm:px-2.5 py-1.5 text-white text-[9px] sm:text-sm focus:outline-none focus:border-white font-['Oswald'] cursor-pointer appearance-none text-center"
+                        >
+                          <option value="Round Trip" className="bg-neutral-900">Round Trip</option>
+                          <option value="One-way" className="bg-neutral-900">One-way</option>
+                        </select>
+                      </div>
 
-                    {modalTripType === 'Round Trip' && (
-                      <div className="p-3 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-xl">
-                        <label className="block text-[10px] uppercase tracking-wider text-white/60 mb-1 font-light flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-white/50 shrink-0" />
+                      {/* Departure */}
+                      <div className="p-2 sm:p-3 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-xl flex flex-col justify-center">
+                        <label className="block text-[9px] sm:text-[10px] uppercase tracking-wider text-white/60 mb-1 font-light truncate flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white/50 shrink-0 hidden sm:block" />
+                          <span className="truncate">Departure</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={bookingDateInput}
+                          onChange={(e) => setBookingDateInput(e.target.value)}
+                          className="w-full bg-transparent sm:bg-white/10 border-0 sm:border sm:border-white/20 rounded-lg sm:rounded-xl px-0 sm:px-2.5 py-1.5 text-white text-[9px] sm:text-sm focus:outline-none font-['Oswald'] cursor-pointer"
+                        />
+                      </div>
+
+                      {/* Return */}
+                      <div className={`p-2 sm:p-3 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-xl flex flex-col justify-center transition-opacity ${modalTripType === 'Round Trip' ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                        <label className="block text-[9px] sm:text-[10px] uppercase tracking-wider text-white/60 mb-1 font-light truncate flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white/50 shrink-0 hidden sm:block" />
                           <span className="truncate">Return</span>
                         </label>
                         <input
@@ -2529,30 +2737,71 @@ export default function App() {
                           value={bookingReturnDateInput}
                           min={bookingDateInput}
                           onChange={(e) => setBookingReturnDateInput(e.target.value)}
-                          className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-white text-xs sm:text-sm focus:outline-none focus:border-white font-['Oswald'] backdrop-blur-md cursor-pointer"
+                          disabled={modalTripType !== 'Round Trip'}
+                          className="w-full bg-transparent sm:bg-white/10 border-0 sm:border sm:border-white/20 rounded-lg sm:rounded-xl px-0 sm:px-2.5 py-1.5 text-white text-[9px] sm:text-sm focus:outline-none font-['Oswald'] cursor-pointer"
                         />
                       </div>
-                    )}
+                    </div>
 
                     <div className="p-3 rounded-2xl border border-white/20 bg-white/[0.06] backdrop-blur-xl">
                       <label className="block text-[10px] uppercase tracking-wider text-white/60 mb-1 font-light flex items-center gap-1">
                         <Users className="w-3 h-3 text-white/50" />
                         <span>Travelers</span>
                       </label>
-                      <select
-                        value={bookingPassengerSelect}
-                        onChange={(e) => setBookingPassengerSelect(e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-white text-xs sm:text-sm focus:outline-none focus:border-white font-['Oswald'] backdrop-blur-md cursor-pointer"
-                      >
-                        <option className="bg-neutral-950 text-white">1 Adult, Economy</option>
-                        <option className="bg-neutral-950 text-white">2 Adults, Economy</option>
-                        <option className="bg-neutral-950 text-white">1 Adult, Business</option>
-                        <option className="bg-neutral-950 text-white">2 Adults, Business</option>
-                        <option className="bg-neutral-950 text-white">1 Adult, First</option>
-                        <option className="bg-neutral-950 text-white">Family (2A + 2C)</option>
-                      </select>
+                      <div className="flex items-center justify-between bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 backdrop-blur-md">
+                        <span className="text-white text-xs sm:text-sm font-['Oswald'] truncate">
+                          {bookingPassengers} {bookingPassengers === 1 ? 'Traveler' : 'Travelers'}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBookingPassengers((p) => {
+                                const newP = Math.max(1, p - 1);
+                                setBookingPassengerSelect(`${newP} ${newP === 1 ? 'Adult' : 'Adults'}, ${bookingCabinClass}`);
+                                return newP;
+                              });
+                            }}
+                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-white/30 text-white text-xs hover:bg-white/20 flex items-center justify-center cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBookingPassengers((p) => {
+                                const newP = Math.min(9, p + 1);
+                                setBookingPassengerSelect(`${newP} ${newP === 1 ? 'Adult' : 'Adults'}, ${bookingCabinClass}`);
+                                return newP;
+                              });
+                            }}
+                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-white/30 text-white text-xs hover:bg-white/20 flex items-center justify-center cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Apply Filters Button */}
+                  <button
+                    onClick={() => {
+                      setAppliedFilters({
+                        originCode: bookingOriginCode,
+                        destCode: bookingDestCode,
+                        passengers: bookingPassengers,
+                        cabinClass: bookingCabinClass,
+                        timestamp: Date.now()
+                      });
+                      setTimeout(() => {
+                        flightsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 50);
+                    }}
+                    className="w-full py-3 mt-1 rounded-xl bg-white text-black hover:bg-neutral-200 transition-colors text-sm font-medium tracking-wider uppercase backdrop-blur-xl shadow-lg active:scale-95 cursor-pointer"
+                  >
+                    Apply Filters
+                  </button>
 
                   {/* Popular Hubs Quick Chips */}
                   <div className="p-3 rounded-2xl border border-white/15 bg-white/[0.03] backdrop-blur-xl">
@@ -2594,7 +2843,7 @@ export default function App() {
                 </div>
 
                 {/* RIGHT SIDE: AVAILABLE FLIGHTS & LIVE FARE SELECTION (col-span-12 lg:col-span-7) */}
-                <div className="lg:col-span-7 space-y-3">
+                <div className="lg:col-span-7 space-y-3" ref={flightsSectionRef}>
                   
                   {/* Flight Section Header */}
                   <div className="flex items-center justify-between px-1">
@@ -2606,16 +2855,36 @@ export default function App() {
                         {bookingOriginInput.match(/\(([A-Z]{3})\)/)?.[1] || 'SFO'} → {bookingDestInput.match(/\(([A-Z]{3})\)/)?.[1] || 'NRT'}
                       </span>
                     </div>
-                    <span className="text-[11px] text-white/50 font-light">
-                      3 Available Fares
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <select 
+                        value={bookingEngineSort}
+                        onChange={(e) => setBookingEngineSort(e.target.value)}
+                        className="bg-transparent border border-white/20 text-white/70 text-[11px] rounded px-2 py-0.5 focus:outline-none cursor-pointer"
+                      >
+                        <option value="Recommended" className="bg-neutral-900">Sort: Recommended</option>
+                        <option value="Lowest Price" className="bg-neutral-900">Sort: Lowest Price</option>
+                        <option value="Highest Price" className="bg-neutral-900">Sort: Highest Price</option>
+                      </select>
+                      <span className="text-[11px] text-white/50 font-light hidden sm:inline">
+                        3 Available Fares
+                      </span>
+                    </div>
                   </div>
 
                   {/* Flight Options Cards */}
                   <div className="space-y-2.5">
-                    {bookingEngineFlights.map((flight, idx) => {
-                      const isSelected = selectedFlightIndex === idx;
-                      return (
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={appliedFilters.timestamp}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-2.5"
+                      >
+                        {bookingEngineFlights.map((flight, idx) => {
+                          const isSelected = selectedFlightIndex === idx;
+                          return (
                         <div
                           key={flight.flightNumber}
                           onClick={() => setSelectedFlightIndex(idx)}
@@ -2643,7 +2912,7 @@ export default function App() {
                             </div>
 
                             <div className="text-right">
-                              <span className="text-xl sm:text-2xl font-medium text-white tracking-tight">
+                              <span className="text-xl sm:text-2xl font-medium text-emerald-400 tracking-tight">
                                 {flight.fare}
                               </span>
                               <span className="text-[10px] text-white/50 block font-light">Taxes incl.</span>
@@ -2679,27 +2948,36 @@ export default function App() {
                         </div>
                       );
                     })}
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
 
                   {/* Selected Flight Inclusions & Perks Summary */}
-                  <div className="p-3.5 rounded-2xl border border-white/15 bg-white/[0.04] backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <span className="text-xs font-medium text-white block">
-                        Included with {bookingEngineFlights[selectedFlightIndex].flightNumber}:
-                      </span>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/70 font-light">
-                        <span>• 2x 23kg Checked Bags</span>
-                        <span>• High-Speed Wi-Fi</span>
-                        <span>• In-Seat Power & USB-C</span>
-                        <span>• Complimentary Dining</span>
+                  <div className="p-3.5 rounded-2xl border border-white/15 bg-white/[0.04] backdrop-blur-xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-white block">
+                          Included with {bookingEngineFlights[selectedFlightIndex].flightNumber}:
+                        </span>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/70 font-light">
+                          <span>• 2x 23kg Checked Bags</span>
+                          <span>• High-Speed Wi-Fi</span>
+                          <span>• In-Seat Power & USB-C</span>
+                          <span>• Complimentary Dining</span>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="text-right sm:shrink-0">
-                      <span className="text-[11px] text-white/50 block font-light">Total for 1 Traveler</span>
-                      <span className="text-xl font-medium text-white">
-                        {bookingEngineFlights[selectedFlightIndex].fare}
+                    
+                    <div className="pt-3 border-t border-white/20 flex items-center justify-between">
+                      <span className="text-xs font-medium text-white/80 uppercase tracking-widest">
+                        Total Cost
                       </span>
+                      <div className="text-right sm:shrink-0 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                        <span className="text-xl sm:text-2xl font-bold text-emerald-400">
+                          {bookingEngineFlights[selectedFlightIndex].fare}
+                        </span>
+                        <span className="text-[10px] text-white/50 block font-light mt-0.5">For {bookingPassengers} {bookingPassengers === 1 ? 'Traveler' : 'Travelers'}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -2847,12 +3125,12 @@ export default function App() {
                       </span>
                       <div className="space-y-1.5 text-xs">
                         <div className="flex items-center justify-between text-white/70">
-                          <span>Base Fare (1 Passenger):</span>
-                          <span>${bookingEngineFlights[selectedFlightIndex].numericFare - 90}</span>
+                          <span>Base Fare ({bookingPassengers} Passenger{bookingPassengers > 1 ? 's' : ''}):</span>
+                          <span>${bookingEngineFlights[selectedFlightIndex].numericFare - (90 * bookingPassengers)}</span>
                         </div>
                         <div className="flex items-center justify-between text-white/70">
                           <span>Taxes & Airport Security Fees:</span>
-                          <span>$90</span>
+                          <span>${90 * bookingPassengers}</span>
                         </div>
                         <div className="flex items-center justify-between text-white/70">
                           <span>Booking & Card Fees:</span>
@@ -3280,8 +3558,9 @@ export default function App() {
             )}
 
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* DESTINATION QUICK DETAIL & BOOKING MODAL */}
       {selectedDestinationForModal && (
@@ -3372,7 +3651,7 @@ export default function App() {
               <X className="w-5 h-5 text-white" />
             </button>
 
-            <div className="flex items-center justify-between border-b border-white/20 pb-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/20 pb-4 mb-6 pr-10 sm:pr-0 gap-3 sm:gap-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 rounded-full bg-white/10 border border-white/20">
                   <PlushyAirplaneLogo className="w-6 h-6" />
@@ -3381,7 +3660,7 @@ export default function App() {
                   Aerial Itinerary
                 </span>
               </div>
-              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-xs uppercase tracking-wider font-mono">
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-xs uppercase tracking-wider font-mono shrink-0">
                 {selectedBookingForItinerary.reference}
               </span>
             </div>
@@ -3410,15 +3689,15 @@ export default function App() {
 
             {/* Flight Details Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl border border-white/20 bg-white/5 mb-6 text-center text-xs">
-              <div className="border-r border-white/10 pr-2">
+              <div className="border-b sm:border-b-0 sm:border-r border-white/10 pb-2 sm:pb-0 sm:pr-2">
                 <span className="text-white/50 uppercase block mb-1">Date</span>
                 <span className="text-white font-medium">{selectedBookingForItinerary.date}</span>
               </div>
-              <div className="border-r border-white/10 pr-2">
+              <div className="border-b sm:border-b-0 sm:border-r border-white/10 pb-2 sm:pb-0 sm:pr-2">
                 <span className="text-white/50 uppercase block mb-1">Time</span>
                 <span className="text-white font-medium">{selectedBookingForItinerary.time}</span>
               </div>
-              <div className="border-r border-white/10 pr-2">
+              <div className="sm:border-r border-white/10 sm:pr-2">
                 <span className="text-white/50 uppercase block mb-1">Terminal</span>
                 <span className="text-white font-medium">{selectedBookingForItinerary.terminal}</span>
               </div>
@@ -3430,20 +3709,20 @@ export default function App() {
 
             {/* Boarding Simulation Barcode */}
             <div className="p-4 rounded-2xl border border-white/15 bg-white/[0.04] mb-6 flex flex-col items-center">
-              <div className="w-full h-10 flex items-center justify-between px-4 opacity-75">
+              <div className="w-full h-10 flex items-center justify-between px-2 sm:px-4 opacity-75 overflow-hidden">
                 {[4, 2, 6, 1, 3, 5, 2, 4, 1, 6, 3, 2, 5, 1, 4, 2, 6, 3, 1, 5, 2, 4, 6].map((w, i) => (
                   <div key={i} className="bg-white h-full" style={{ width: `${w * 2}px` }} />
                 ))}
               </div>
-              <span className="text-[11px] text-white/50 uppercase tracking-widest mt-2 font-mono">
-                BOARDING PASS · {selectedBookingForItinerary.reference} · AR-CONFIRMED
+              <span className="text-[9px] sm:text-[11px] text-white/50 uppercase tracking-widest mt-2 font-mono text-center">
+                BOARDING PASS · {selectedBookingForItinerary.reference}
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
               <button
                 onClick={() => setSelectedBookingForItinerary(null)}
-                className="flex-1 py-3 rounded-full bg-white text-black font-normal text-sm hover:bg-neutral-200 transition-colors uppercase tracking-wider text-center cursor-pointer"
+                className="w-full sm:w-auto flex-1 py-3 rounded-full bg-white text-black font-normal text-sm hover:bg-neutral-200 transition-colors uppercase tracking-wider text-center cursor-pointer"
               >
                 Done
               </button>
@@ -3451,7 +3730,7 @@ export default function App() {
                 onClick={() => {
                   handleCancelBooking(selectedBookingForItinerary.id);
                 }}
-                className="px-6 py-3 rounded-full border border-red-500/40 text-red-300 font-normal text-sm hover:bg-red-500/10 transition-colors uppercase tracking-wider cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3 rounded-full border border-red-500/40 text-red-300 font-normal text-sm hover:bg-red-500/10 transition-colors uppercase tracking-wider cursor-pointer"
               >
                 Cancel Booking
               </button>
@@ -3627,7 +3906,7 @@ export default function App() {
                 },
                 {
                   q: 'Can I book multi-city routes or open-jaw tickets?',
-                  a: 'Yes! Simply select the Multi City option in our booking engine to combine flights across different destinations in one seamless reservation.',
+                  a: 'Currently, Aerial focuses on providing the best experience for one-way and round-trip flights. Multi-city bookings are in development and will be available soon!',
                 },
                 {
                   q: 'What is Aerial’s standard baggage policy?',

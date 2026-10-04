@@ -25,23 +25,58 @@ const ScrollAnimationBackground: React.FC = () => {
     let currentlyDrawnFrame = -1;
     let animationFrameId: number;
     let isUnmounted = false;
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
 
-    // Cover-fit image on canvas maintaining aspect ratio and sharpness
-    const drawImageCover = (img: HTMLImageElement) => {
+    // Render frame: Desktop maintains exact cover fit; Mobile seamlessly fits the portrait screen
+    const renderFrame = (img: HTMLImageElement) => {
       if (!img || !img.complete || !img.naturalWidth || !ctx || !canvas) return;
 
       const cw = canvas.width;
       const ch = canvas.height;
       const iw = img.naturalWidth;
       const ih = img.naturalHeight;
+      const isMobile = window.innerWidth < 768;
 
-      const scale = Math.max(cw / iw, ch / ih);
-      const w = iw * scale;
-      const h = ih * scale;
-      const x = (cw - w) * 0.5;
-      const y = (ch - h) * 0.5;
+      if (!isMobile) {
+        // Desktop version - 100% UNCHANGED
+        const scale = Math.max(cw / iw, ch / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        const x = (cw - w) * 0.5;
+        const y = (ch - h) * 0.5;
+        ctx.drawImage(img, x, y, w, h);
+      } else {
+        // Mobile platform: Fit the background seamlessly with the portrait screen
+        const scale = Math.max(cw / iw, ch / ih);
+        const w = iw * scale;
+        const h = ih * scale;
 
-      ctx.drawImage(img, x, y, w, h);
+        const isPortrait = ch > cw;
+        if (!isPortrait) {
+          // Mobile in landscape orientation - standard centered cover fit
+          const x = (cw - w) * 0.5;
+          const y = (ch - h) * 0.5;
+          ctx.drawImage(img, x, y, w, h);
+        } else {
+          // Mobile in portrait orientation:
+          // Dynamically track visual focal interest across frames:
+          // - In Hero (frames 1-35, progress 0 -> 0.28): Airplane is centered at x ~ 0.77 (cockpit, windows & fuselage in full view)
+          // - Scrolling into Destinations & beyond (progress >= 0.28): Smoothly pans to center (x = 0.50) where Mount Everest summit is located
+          let focalX = 0.50;
+          if (currentProgress < 0.28) {
+            const t = currentProgress / 0.28;
+            const ease = t * t * (3 - 2 * t);
+            focalX = 0.77 - 0.27 * ease;
+          }
+
+          const targetX = cw * 0.5 - w * focalX;
+          const x = Math.max(cw - w, Math.min(0, targetX));
+          const y = (ch - h) * 0.5;
+
+          ctx.drawImage(img, x, y, w, h);
+        }
+      }
     };
 
     // Find the best loaded frame and return both image and its real frame number
@@ -69,10 +104,20 @@ const ScrollAnimationBackground: React.FC = () => {
       return null;
     };
 
-    // Responsive high-DPI canvas sizing
-    const handleResize = () => {
+    // Responsive high-DPI canvas sizing (optimized DPR for mobile 60-120fps, desktop unchanged)
+    const handleResize = (force = false) => {
       if (!canvas || !ctx) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const isMobile = window.innerWidth < 768;
+
+      // On mobile, ignore small vertical-only address bar jitter during scrolling
+      if (!force && isMobile && Math.abs(window.innerWidth - lastWidth) < 12 && Math.abs(window.innerHeight - lastHeight) < 70) {
+        return;
+      }
+      lastWidth = window.innerWidth;
+      lastHeight = window.innerHeight;
+
+      // Universally upscale the DPR for maximum crispness
+      const dpr = Math.min(window.devicePixelRatio || 2, 3);
       const w = window.innerWidth;
       const h = window.innerHeight;
 
@@ -89,7 +134,7 @@ const ScrollAnimationBackground: React.FC = () => {
       );
       const best = getBestAvailableFrame(frameIdx);
       if (best) {
-        drawImageCover(best.img);
+        renderFrame(best.img);
         currentlyDrawnFrame = best.index;
       }
     };
@@ -105,19 +150,6 @@ const ScrollAnimationBackground: React.FC = () => {
       img.onload = () => {
         if (isUnmounted) return;
         isLoaded[idx] = 1;
-
-        // If this newly loaded frame is closer to the current scroll target than what's currently painted on canvas
-        const currentTarget = Math.max(
-          1,
-          Math.min(frameCount, Math.round(1 + currentProgress * (frameCount - 1)))
-        );
-        const distCurrent = Math.abs(currentlyDrawnFrame - currentTarget);
-        const distNew = Math.abs(idx - currentTarget);
-
-        if (currentlyDrawnFrame === -1 || distNew < distCurrent) {
-          drawImageCover(img);
-          currentlyDrawnFrame = idx;
-        }
       };
 
       img.src = getFrameUrl(idx);
@@ -125,31 +157,36 @@ const ScrollAnimationBackground: React.FC = () => {
       return img;
     };
 
-    // Preload frames in quick progressive stream
+    // Preload frames progressively
     const initPreload = () => {
       // 1. Frame 1 with high priority
       const firstImg = loadSingleFrame(1, true);
       if (firstImg.complete && firstImg.naturalWidth > 0) {
         isLoaded[1] = 1;
-        drawImageCover(firstImg);
+        renderFrame(firstImg);
         currentlyDrawnFrame = 1;
       }
 
-      // 2. Stream-load all remaining frames in fast batches of 5 every 20ms
-      let streamIdx = 2;
+      // 2. Preload first 20 frames immediately for instant responsiveness
+      for (let i = 2; i <= Math.min(25, frameCount); i++) {
+        loadSingleFrame(i);
+      }
+
+      // 3. Stream remaining frames in batches
+      let streamIdx = 26;
       const streamNext = () => {
         if (isUnmounted || streamIdx > frameCount) return;
-        const end = Math.min(streamIdx + 5, frameCount);
+        const end = Math.min(streamIdx + 6, frameCount);
         for (let i = streamIdx; i <= end; i++) {
           loadSingleFrame(i);
         }
         streamIdx = end + 1;
         if (streamIdx <= frameCount) {
-          setTimeout(streamNext, 20);
+          setTimeout(streamNext, 10);
         }
       };
 
-      setTimeout(streamNext, 40);
+      setTimeout(streamNext, 50);
     };
 
     // Calculate normalized scroll progress (0 to 1)
@@ -163,7 +200,7 @@ const ScrollAnimationBackground: React.FC = () => {
         1,
         Math.min(frameCount, Math.round(1 + targetProgress * (frameCount - 1)))
       );
-      for (let off = -4; off <= 8; off++) {
+      for (let off = -5; off <= 10; off++) {
         const f = targetFrame + off;
         if (f >= 1 && f <= frameCount && !images[f]) {
           loadSingleFrame(f, true);
@@ -171,13 +208,20 @@ const ScrollAnimationBackground: React.FC = () => {
       }
     };
 
-    // Physics-damped animation loop (60/120Hz smooth lerp)
-    const tick = () => {
+    // Physics-damped animation loop (silky smooth 60/120fps lerp)
+    let lastTime = performance.now();
+    const tick = (now: number) => {
       if (isUnmounted) return;
 
-      const lerpFactor = 0.08;
-      const delta = targetProgress - currentProgress;
+      const isMobile = window.innerWidth < 768;
+      // Use much snappier factors for higher perceived FPS
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
 
+      const baseFactor = isMobile ? 0.35 : 0.15;
+      const lerpFactor = 1 - Math.pow(1 - baseFactor, dt * 60);
+
+      const delta = targetProgress - currentProgress;
       if (Math.abs(delta) > 0.00004) {
         currentProgress += delta * lerpFactor;
       } else {
@@ -192,7 +236,7 @@ const ScrollAnimationBackground: React.FC = () => {
       const best = getBestAvailableFrame(targetFrame);
       if (best && best.img.complete && best.img.naturalWidth > 0) {
         if (best.index !== currentlyDrawnFrame) {
-          drawImageCover(best.img);
+          renderFrame(best.img);
           currentlyDrawnFrame = best.index;
         }
       }
@@ -202,10 +246,14 @@ const ScrollAnimationBackground: React.FC = () => {
 
     // Attach listeners
     window.addEventListener('scroll', updateTargetProgress, { passive: true });
-    window.addEventListener('resize', handleResize, { passive: true });
+    const onResize = () => handleResize(false);
+    const onOrientationChange = () => handleResize(true);
+
+    window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('orientationchange', onOrientationChange, { passive: true });
 
     // Initial setup
-    handleResize();
+    handleResize(true);
     initPreload();
     updateTargetProgress();
     currentProgress = targetProgress;
@@ -215,16 +263,18 @@ const ScrollAnimationBackground: React.FC = () => {
       isUnmounted = true;
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('scroll', updateTargetProgress);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientationChange);
     };
   }, []);
 
   return (
     <div className="fixed inset-0 w-full h-full -z-10 pointer-events-none overflow-hidden bg-black flex justify-center items-center">
-      {/* High-DPI Smooth Animation Canvas - Full opacity, NO underlying poster image */}
+      {/* High-DPI Smooth Animation Canvas */}
       <canvas
         ref={canvasRef}
-        className="w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full block"
+        style={{ willChange: 'transform', transform: 'translateZ(0)' }}
       />
 
       {/* Cinematic subtle contrast vignette for crystal clear text readability across all sections */}
